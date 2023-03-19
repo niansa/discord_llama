@@ -9,7 +9,7 @@ add_subdirectory(llama.cpp)
 add_subdirectory(DPP)
 
 add_executable(discord_llama main.cpp)
-target_link_libraries(discord_llama PUBLIC dpp)
+target_link_libraries(discord_llama PUBLIC dpp pthread)
 
 install(TARGETS discord_llama
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
