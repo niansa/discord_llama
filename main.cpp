@@ -32,6 +32,16 @@ std::vector<std::string_view> str_split(std::string_view s, char delimiter, size
     return to_return;
 }
 
+static
+void str_replace_in_place(std::string& subject, std::string_view search,
+                         const std::string& replace) {
+    size_t pos = 0;
+    while ((pos = subject.find(search, pos)) != std::string::npos) {
+         subject.replace(pos, search.length(), replace);
+         pos += replace.length();
+    }
+}
+
 
 class LLM {
     struct Exception : public std::runtime_error {
@@ -196,6 +206,7 @@ class Bot {
     }
 
     void attempt_reply(const dpp::message& msg) {
+        auto content = msg.content;
         // Always reply to 10th message
         if (history.size() == 5) {
             return reply();
@@ -206,9 +217,10 @@ class Bot {
             if (rng.getBool(0.075f)) {
                 return reply();
             }
-            // Reply if message contains username or ID
-            if (msg.content.find(bot.me.username) != std::string::npos
-             || msg.content.find(bot.me.id) != std::string::npos) {
+            // Reply if message contains username, mention or ID
+            str_replace_in_place(content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
+            if (content.find(bot.me.username) != std::string::npos
+             || content.find(bot.me.id) != std::string::npos) {
                 return reply();
             }
             // Reply if message references user
