@@ -50,7 +50,7 @@ class LLM {
 
         int32_t top_k = 40;
         float   top_p = 0.5f;
-        float   temp  = 0.735f;
+        float   temp  = 0.78f;
         float   repeat_penalty  = 1.17647f;
     } params;
 
