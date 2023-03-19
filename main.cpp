@@ -162,6 +162,7 @@ class Bot {
             prompts << "Log des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der gerne mitredet.\n\n";
             // Append each message to stream
             for (const auto& msg : history) {
+                if (msg.author.id == bot.me.id && !msg.edited) return;
                 for (const auto line : str_split(msg.content, '\n')) {
                     prompts << msg.author.username << ": " << line << '\n';
                 }
