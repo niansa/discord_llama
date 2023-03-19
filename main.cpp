@@ -53,10 +53,10 @@ class LLM {
 
     ProcPipe<false, true, false> llama;
     struct {
-        std::string model = "13B-ggml-model-quant.bin";
+        std::string model = "7B-ggml-model-quant.bin";
 
         int32_t seed; // RNG seed
-        int32_t n_threads = static_cast<int32_t>(std::thread::hardware_concurrency()) / 2;
+        int32_t n_threads = static_cast<int32_t>(std::thread::hardware_concurrency()) / 4;
         int32_t n_predict = 20000; // new tokens to predict
         int32_t repeat_last_n = 256;  // last n tokens to penalize
         int32_t n_ctx = 2024; //context size
@@ -103,7 +103,7 @@ public:
         start();
 
         // Wait for a bit
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::minutes(2));
 
         // Make sure everything is alright
         if (!llama.isRunning()) {
