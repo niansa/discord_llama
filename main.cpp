@@ -196,7 +196,7 @@ class Bot {
             }
             // Send resulting message
             msg.content = output;
-            bot.message_edit(msg);
+            msg = bot.message_edit_sync(msg);
             // Add message to list of my messages
             my_messages.push_back(msg.id); // Unsafe!!
         }).detach();
