@@ -88,7 +88,7 @@ public:
         params.seed = seed?seed:time(NULL);
     }
 
-    std::string run(std::string_view prompt, const char *end = nullptr, const std::function<void ()>& on_tick = nullptr) {
+    std::string run(std::string_view prompt, const char *end = nullptr, const std::function<bool ()>& on_tick = nullptr) {
         std::string fres;
 
         // Write prompt into file
@@ -127,7 +127,7 @@ public:
                 break;
             }
             // Tick
-            if (on_tick) on_tick();
+            if (on_tick && !on_tick()) return "";
         } while (llama.isRunning());
 
         // Erase end
@@ -187,7 +187,18 @@ class Bot {
             std::scoped_lock L(llm_lock);
             std::string output;
             Timer typingIndicatorTimer;
-            output = LLM().run(prompt, "\n");
+            bool timed_out;
+            do {
+                Timer timeout;
+                timed_out = false;
+                output = LLM().run(prompt, "\n", [&] () {
+                    if (timeout.get<std::chrono::seconds>() > 30) {
+                        timed_out = true;
+                        return false;
+                    }
+                    return true;
+                });
+            } while (timed_out);
             // Send resulting message
             msg.content = output;
             bot.message_edit(msg);
