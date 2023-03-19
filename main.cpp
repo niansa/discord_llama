@@ -10,6 +10,8 @@
 #include <thread>
 #include <chrono>
 #include <functional>
+#include <vector>
+#include <map>
 #include <mutex>
 #include <memory>
 #include <dpp/dpp.h>
@@ -150,7 +152,7 @@ class Bot {
     dpp::cluster bot;
     dpp::channel channel;
     dpp::snowflake channel_id;
-    std::vector<dpp::message> history;
+    std::map<dpp::snowflake, dpp::message> history;
     std::vector<dpp::snowflake> my_messages;
 
     void reply() {
@@ -162,7 +164,7 @@ class Bot {
             // Append channel name
             prompts << "Log des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der gerne mitredet.\n\n";
             // Append each message to stream
-            for (const auto& msg : history) {
+            for (const auto& [id, msg] : history) {
                 if (msg.author.id == bot.me.id && !msg.edited) continue;
                 for (const auto line : str_split(msg.content, '\n')) {
                     prompts << msg.author.username << ": " << line << '\n';
@@ -189,14 +191,10 @@ class Bot {
             std::string output;
             Timer typingIndicatorTimer;
             puts("000000000000");
-            try {
-                output = LLM().run(prompt, "\n");
-            } catch (...) {
-                std::rethrow_exception(std::current_exception());
-            }
+            output = LLM().run(prompt, "\n");
             // Send resulting message
             msg.content = output;
-            msg = bot.message_edit_sync(msg);
+            bot.message_edit(msg);
             // Add message to list of my messages
             my_messages.push_back(msg.id); // Unsafe!!
         }).detach();
@@ -271,11 +269,14 @@ public:
             // Make sure message has content
             if (event.msg.content.empty()) return;
             // Append message to history
-            history.push_back(event.msg);
+            history[event.msg.id] = event.msg;
             // Attempt to send a reply
             attempt_reply(event.msg);
             // Reset last message timer
             last_message_timer.reset();
+        });
+        bot.on_message_update([=] (const dpp::message_update_t& event) {
+            history[event.msg.id] = event.msg;
         });
     }
 
