@@ -227,7 +227,6 @@ class Bot {
                 return reply();
             }*/
             // Reply if message contains username, mention or ID
-            str_replace_in_place(content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
             if (content.find(bot.me.username) != std::string::npos) {
                 puts("1111111111");
                 return reply();
@@ -269,14 +268,18 @@ public:
             // Make sure message has content
             if (event.msg.content.empty()) return;
             // Append message to history
-            history[event.msg.id] = event.msg;
+            auto msg = event.msg;
+            str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
+            history[msg.id] = msg;
             // Attempt to send a reply
-            attempt_reply(event.msg);
+            attempt_reply(msg);
             // Reset last message timer
             last_message_timer.reset();
         });
         bot.on_message_update([=] (const dpp::message_update_t& event) {
-            history[event.msg.id] = event.msg;
+            auto msg = event.msg;
+            str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
+            history[msg.id] = msg;
         });
     }
 
