@@ -173,6 +173,8 @@ class Bot {
             } catch (...) {
                 std::rethrow_exception(std::current_exception());
             }
+            // Start typing
+            bot.channel_typing(channel_id);
             // Send resulting message
             auto msg = bot.message_create_sync(dpp::message(channel_id, output));
             // Add message to list of my messages
