@@ -277,6 +277,11 @@ public:
             last_message_timer.reset();
         });
         bot.on_message_update([=] (const dpp::message_update_t& event) {
+            // Make sure message source is correct
+            if (event.msg.channel_id != channel_id) return;
+            // Make sure message has content
+            if (event.msg.content.empty()) return;
+            // Update message in history
             auto msg = event.msg;
             str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
             history[msg.id] = msg;
