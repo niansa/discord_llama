@@ -1,0 +1,6 @@
+[submodule "llama.cpp"]
+	path = llama.cpp
+	url = https://github.com/ggerganov/llama.cpp.git
+[submodule "DPP"]
+	path = DPP
+	url = https://github.com/brainboxdotcc/DPP.git
