@@ -161,7 +161,7 @@ class Bot {
         {
             std::ostringstream prompts;
             // Append channel name
-            prompts << "Log des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher aber etwas frecher Chatbot.\n\n";
+            prompts << "Log des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der gerne mitredet.\n\n";
             // Append each message to stream
             for (const auto& [id, msg] : history) {
                 if (msg.author.id == bot.me.id && !msg.edited) continue;
