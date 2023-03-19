@@ -40,7 +40,7 @@ class LLM {
 
     ProcPipe<false, true, false> llama;
     struct {
-        std::string model = "7B-ggml-model-quant.bin";
+        std::string model = "13B-ggml-model-quant.bin";
 
         int32_t seed; // RNG seed
         int32_t n_threads = static_cast<int32_t>(std::thread::hardware_concurrency()) / 2;
@@ -50,7 +50,7 @@ class LLM {
 
         int32_t top_k = 40;
         float   top_p = 0.5f;
-        float   temp  = 0.84f;
+        float   temp  = 0.735f;
         float   repeat_penalty  = 1.17647f;
     } params;
 
