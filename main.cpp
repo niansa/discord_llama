@@ -155,7 +155,7 @@ class Bot {
 
     void reply() {
         // Start new thread
-        std::thread([this, prompt = std::move(prompt)] () {
+        std::thread([this] () {
             // Create placeholder message
             auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
             // Wait for lock
