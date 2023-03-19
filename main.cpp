@@ -210,25 +210,18 @@ class Bot {
     }
 
     void attempt_reply(const dpp::message& msg) {
-        // Always reply to 5th message
-        if (history.size() == 5) {
+        // Decide randomly
+        /*if (rng.getBool(0.075f)) {
+            return reply();
+        }*/
+        // Reply if message contains username, mention or ID
+        if (msg.content.find(bot.me.username) != std::string::npos) {
             return reply();
         }
-        // Do not reply before 5th message
-        if (history.size() > 5) {
-            // Decide randomly
-            /*if (rng.getBool(0.075f)) {
+        // Reply if message references user
+        for (const auto msg_id : my_messages) {
+            if (msg.message_reference.message_id == msg_id) {
                 return reply();
-            }*/
-            // Reply if message contains username, mention or ID
-            if (msg.content.find(bot.me.username) != std::string::npos) {
-                return reply();
-            }
-            // Reply if message references user
-            for (const auto msg_id : my_messages) {
-                if (msg.message_reference.message_id == msg_id) {
-                    return reply();
-                }
             }
         }
     }
