@@ -154,6 +154,7 @@ class Bot {
     std::vector<dpp::snowflake> my_messages;
 
     void reply() {
+        puts("LLLLLLLLLLLLLLL");
         // Generate prompt
         std::string prompt;
         {
@@ -175,8 +176,10 @@ class Bot {
         // Make sure prompt isn't to long; if so, erase a message and retry
         if (prompt.size() > 400) {
             history.erase(history.begin());
+            puts("WWWWWWWWWWW");
             return reply();
         }
+        puts("MMMMMMMMMMM");
         // Start new thread
         std::thread([this, prompt = std::move(prompt)] () {
             // Create placeholder message
@@ -185,6 +188,7 @@ class Bot {
             std::scoped_lock L(llm_lock);
             std::string output;
             Timer typingIndicatorTimer;
+            puts("000000000000");
             try {
                 output = LLM().run(prompt, "\n");
             } catch (...) {
@@ -215,6 +219,7 @@ class Bot {
         auto content = msg.content;
         // Always reply to 5th message
         if (history.size() == 5) {
+            puts("33333333333");
             return reply();
         }
         // Do not reply before 5th message
@@ -226,11 +231,13 @@ class Bot {
             // Reply if message contains username, mention or ID
             str_replace_in_place(content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
             if (content.find(bot.me.username) != std::string::npos) {
+                puts("1111111111");
                 return reply();
             }
             // Reply if message references user
             for (const auto msg_id : my_messages) {
                 if (msg.message_reference.message_id == msg_id) {
+                    puts("222222222222");
                     return reply();
                 }
             }
