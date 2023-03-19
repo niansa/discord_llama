@@ -56,7 +56,7 @@ class LLM {
         std::string model = "7B-ggml-model-quant.bin";
 
         int32_t seed; // RNG seed
-        int32_t n_threads = static_cast<int32_t>(std::thread::hardware_concurrency()) / 4;
+        int32_t n_threads = static_cast<int32_t>(std::thread::hardware_concurrency()) / 2;
         int32_t n_predict = 20000; // new tokens to predict
         int32_t repeat_last_n = 256;  // last n tokens to penalize
         int32_t n_ctx = 2024; //context size
