@@ -214,7 +214,8 @@ class Bot {
     }
 
     void attempt_reply(const dpp::message& msg) {
-        auto content = msg.content;
+        // Debug
+        std::cout << "Attempting to reply to: " << msg.content << std::endl;
         // Always reply to 5th message
         if (history.size() == 5) {
             puts("33333333333");
@@ -227,7 +228,7 @@ class Bot {
                 return reply();
             }*/
             // Reply if message contains username, mention or ID
-            if (content.find(bot.me.username) != std::string::npos) {
+            if (msg.content.find(bot.me.username) != std::string::npos) {
                 puts("1111111111");
                 return reply();
             }
