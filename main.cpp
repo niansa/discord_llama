@@ -224,8 +224,7 @@ class Bot {
             }
             // Reply if message contains username, mention or ID
             str_replace_in_place(content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
-            if (content.find(bot.me.username) != std::string::npos
-             || content.find(bot.me.id) != std::string::npos) {
+            if (content.find(bot.me.username) != std::string::npos) {
                 return reply();
             }
             // Reply if message references user
