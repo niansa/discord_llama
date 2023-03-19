@@ -206,7 +206,7 @@ class Bot {
             // Wait for a bit
             std::this_thread::sleep_for(std::chrono::minutes(5));
             // Check if last message was more than 20 minutes ago
-            if (last_message_timer.get<std::chrono::minutes>() > 20) {
+            if (last_message_timer.get<std::chrono::hours>() > 3) {
                 // Force reply
                 reply();
             }
