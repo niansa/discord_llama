@@ -146,7 +146,7 @@ class Bot {
         {
             std::ostringstream prompts;
             // Append channel name
-            prompts << "Log of #general channel.\n\n";
+            prompts << "Log des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer praezise und genau antwortet.\n\n";
             // Append each message to stream
             for (const auto& msg : history) {
                 for (const auto line : str_split(msg.content, '\n')) {
