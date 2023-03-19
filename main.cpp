@@ -56,7 +56,7 @@ class LLM {
         std::string model = "7B-ggml-model-quant.bin";
 
         int32_t seed; // RNG seed
-        int32_t n_threads = static_cast<int32_t>(std::thread::hardware_concurrency()) / 2;
+        int32_t n_threads = static_cast<int32_t>(std::thread::hardware_concurrency()) / 4;
         int32_t n_predict = 20000; // new tokens to predict
         int32_t repeat_last_n = 256;  // last n tokens to penalize
         int32_t n_ctx = 2024; //context size
@@ -103,7 +103,7 @@ public:
         start();
 
         // Wait for a bit
-        std::this_thread::sleep_for(std::chrono::minutes(2));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
         // Make sure everything is alright
         if (!llama.isRunning()) {
@@ -192,7 +192,7 @@ class Bot {
                 Timer timeout;
                 timed_out = false;
                 output = LLM().run(prompt, "\n", [&] () {
-                    if (timeout.get<std::chrono::seconds>() > 30) {
+                    if (timeout.get<std::chrono::minutes>() > 2) {
                         timed_out = true;
                         return false;
                     }
