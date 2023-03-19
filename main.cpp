@@ -212,16 +212,16 @@ class Bot {
 
     void attempt_reply(const dpp::message& msg) {
         auto content = msg.content;
-        // Always reply to 10th message
+        // Always reply to 5th message
         if (history.size() == 5) {
             return reply();
         }
-        // Do not reply before 10th message
+        // Do not reply before 5th message
         if (history.size() > 5) {
             // Decide randomly
-            if (rng.getBool(0.075f)) {
+            /*if (rng.getBool(0.075f)) {
                 return reply();
-            }
+            }*/
             // Reply if message contains username, mention or ID
             str_replace_in_place(content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
             if (content.find(bot.me.username) != std::string::npos) {
