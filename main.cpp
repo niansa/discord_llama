@@ -154,35 +154,36 @@ class Bot {
     std::vector<dpp::snowflake> my_messages;
 
     void reply() {
-        // Generate prompt
-        std::string prompt;
-        {
-            std::ostringstream prompts;
-            // Append channel name
-            prompts << "Log des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der gerne mitredet.\n\n";
-            // Append each message to stream
-            for (const auto& msg : history) {
-                if (msg.author.id == bot.me.id && !msg.edited) return;
-                for (const auto line : str_split(msg.content, '\n')) {
-                    prompts << msg.author.username << ": " << line << '\n';
-                }
-            }
-            // Make LLM respond
-            prompts << bot.me.username << ':';
-            // Keep resulting string
-            prompt = prompts.str();
-        }
-        // Make sure prompt isn't to long; if so, erase a message and retry
-        if (prompt.size() > 200) {
-            history.erase(history.begin());
-            return reply();
-        }
         // Start new thread
         std::thread([this, prompt = std::move(prompt)] () {
             // Create placeholder message
             auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
-            // Run model
+            // Wait for lock
             std::scoped_lock L(llm_lock);
+            // Generate prompt
+            std::string prompt;
+            {
+                std::ostringstream prompts;
+                // Append channel name
+                prompts << "Log des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der gerne mitredet.\n\n";
+                // Append each message to stream
+                for (const auto& msg : history) {
+                    if (msg.author.id == bot.me.id && !msg.edited) return;
+                    for (const auto line : str_split(msg.content, '\n')) {
+                        prompts << msg.author.username << ": " << line << '\n';
+                    }
+                }
+                // Make LLM respond
+                prompts << bot.me.username << ':';
+                // Keep resulting string
+                prompt = prompts.str();
+            }
+            // Make sure prompt isn't to long; if so, erase a message and retry
+            if (prompt.size() > 200) {
+                history.erase(history.begin());
+                return reply();
+            }
+            // Run model
             std::string output;
             Timer typingIndicatorTimer;
             try {
