@@ -9,6 +9,7 @@
 #include <fstream>
 #include <thread>
 #include <chrono>
+#include <functional>
 #include <mutex>
 #include <memory>
 #include <dpp/dpp.h>
@@ -85,7 +86,7 @@ public:
         params.seed = seed?seed:time(NULL);
     }
 
-    std::string run(std::string_view prompt, const char *end = nullptr) {
+    std::string run(std::string_view prompt, const char *end = nullptr, const std::function<void ()>& on_tick = nullptr) {
         std::string fres;
 
         // Write prompt into file
@@ -123,6 +124,8 @@ public:
             if (res != fres.npos && res > prompt.size()) {
                 break;
             }
+            // Tick
+            if (on_tick) on_tick();
         } while (llama.isRunning());
 
         // Erase end
@@ -173,20 +176,22 @@ class Bot {
             history.erase(history.begin());
             return reply();
         }
-        // Start typing
-        bot.channel_typing(channel_id);
         // Start new thread
         std::thread([this, prompt = std::move(prompt)] () {
+            // Create placeholder message
+            auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
             // Run model
             std::scoped_lock L(llm_lock);
             std::string output;
+            Timer typingIndicatorTimer;
             try {
                 output = LLM().run(prompt, "\n");
             } catch (...) {
                 std::rethrow_exception(std::current_exception());
             }
             // Send resulting message
-            auto msg = bot.message_create_sync(dpp::message(channel_id, output));
+            msg.content = output;
+            bot.message_edit(msg);
             // Add message to list of my messages
             my_messages.push_back(msg.id); // Unsafe!!
         }).detach();
