@@ -147,7 +147,7 @@ class Bot {
     RandomGenerator rng;
     Timer last_message_timer;
     std::shared_ptr<bool> stopping;
-    std::mutex llm_lock;
+    std::mutex reply_lock;
 
     dpp::cluster bot;
     dpp::channel channel;
@@ -156,7 +156,6 @@ class Bot {
     std::vector<dpp::snowflake> my_messages;
 
     void reply() {
-        auto L = std::make_unique<std::scoped_lock<std::mutex>>(llm_lock);
         // Generate prompt
         std::string prompt;
         {
@@ -165,7 +164,13 @@ class Bot {
             prompts << "Log des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der gerne mitredet.\n\n";
             // Append each message to stream
             for (const auto& [id, msg] : history) {
-                if (msg.author.id == bot.me.id && !msg.edited) continue;
+                bool hide = msg.author.id == bot.me.id;
+                if (hide) {
+                    for (const auto msg_id : my_messages) {
+                        if (id == msg_id) hide = false;
+                    }
+                }
+                if (hide) continue;
                 for (const auto line : str_split(msg.content, '\n')) {
                     prompts << msg.author.username << ": " << line << '\n';
                 }
@@ -181,7 +186,8 @@ class Bot {
             return reply();
         }
         // Start new thread
-        std::thread([this, prompt = std::move(prompt), L = std::move(L)] () {
+        std::thread([this, prompt = std::move(prompt)] () {
+            std::scoped_lock L(reply_lock);
             // Create placeholder message
             auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
             // Run model
