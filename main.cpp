@@ -181,7 +181,7 @@ class Bot {
             prompt = prompts.str();
         }
         // Make sure prompt isn't to long; if so, erase a message and retry
-        if (prompt.size() > 300) {
+        if (prompt.size() > 250) {
             history.erase(history.begin());
             return reply();
         }
