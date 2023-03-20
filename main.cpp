@@ -156,6 +156,7 @@ class Bot {
     std::vector<dpp::snowflake> my_messages;
 
     void reply() {
+        auto L = std::make_unique<std::scoped_lock<std::mutex>>(llm_lock);
         // Generate prompt
         std::string prompt;
         {
@@ -180,11 +181,10 @@ class Bot {
             return reply();
         }
         // Start new thread
-        std::thread([this, prompt = std::move(prompt)] () {
+        std::thread([this, prompt = std::move(prompt), L = std::move(L)] () {
             // Create placeholder message
             auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
             // Run model
-            std::scoped_lock L(llm_lock);
             std::string output;
             Timer timeout;
             bool timed_out = false;
