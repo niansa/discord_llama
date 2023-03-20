@@ -186,19 +186,16 @@ class Bot {
             // Run model
             std::scoped_lock L(llm_lock);
             std::string output;
-            Timer typingIndicatorTimer;
-            bool timed_out;
-            do {
-                Timer timeout;
-                timed_out = false;
-                output = LLM().run(prompt, "\n", [&] () {
-                    if (timeout.get<std::chrono::minutes>() > 4) {
-                        timed_out = true;
-                        return false;
-                    }
-                    return true;
-                });
-            } while (timed_out);
+            Timer timeout;
+            bool timed_out = false;
+            output = LLM().run(prompt, "\n", [&] () {
+                if (timeout.get<std::chrono::minutes>() > 4) {
+                    timed_out = true;
+                    return false;
+                }
+                return true;
+            });
+            if (timed_out) output = "Fehler: Zeitüberschreitung";
             // Send resulting message
             msg.content = output;
             bot.message_edit(msg);
