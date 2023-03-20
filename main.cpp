@@ -192,7 +192,7 @@ class Bot {
                 Timer timeout;
                 timed_out = false;
                 output = LLM().run(prompt, "\n", [&] () {
-                    if (timeout.get<std::chrono::minutes>() > 2) {
+                    if (timeout.get<std::chrono::minutes>() > 4) {
                         timed_out = true;
                         return false;
                     }
