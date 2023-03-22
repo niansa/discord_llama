@@ -1,4 +1,3 @@
-#include "ProcPipe.hpp"
 #include "Random.hpp"
 #include "Timer.hpp"
 
@@ -15,6 +14,8 @@
 #include <mutex>
 #include <memory>
 #include <dpp/dpp.h>
+#include <ggml.h>
+#include <llama.h>
 
 #ifndef _POSIX_VERSION
 #   error "Not compatible with non-POSIX systems"
@@ -46,20 +47,32 @@ void str_replace_in_place(std::string& subject, std::string_view search,
 }
 
 
+class OwningStringView : public std::string_view {
+    std::string owned;
+
+public:
+    OwningStringView(std::string&& str, std::string_view view)
+        : owned(std::move(str)), std::string_view(view) {}
+
+    using std::string_view::operator[];
+};
+
+
 class LLM {
     struct Exception : public std::runtime_error {
         using std::runtime_error::runtime_error;
     };
 
-    ProcPipe<false, true, false> llama;
+    llama_context *ctx;
+
     struct {
-        std::string model = "13B-ggml-model-quant.bin";
+        std::string model = "7B-ggml-model-quant.bin";
 
         int32_t seed; // RNG seed
         int32_t n_threads = static_cast<int32_t>(std::thread::hardware_concurrency()) / 4;
-        int32_t n_predict = 20000; // new tokens to predict
-        int32_t repeat_last_n = 256;  // last n tokens to penalize
-        int32_t n_ctx = 2024; //context size
+        int32_t repeat_last_n = 256;  // Last n tokens to penalize
+        int32_t n_ctx = 2024; // Context size
+        int32_t n_batch = 8; // Batch size
 
         int32_t top_k = 40;
         float   top_p = 0.5f;
@@ -71,74 +84,151 @@ class LLM {
         return "/tmp/discord_llama_"+std::to_string(getpid())+".txt";
     }
 
-    void start() {
-        // Start process
-        const auto exe_path = "./llama.cpp/llama";
-        llama.start(exe_path, "-m", params.model.c_str(), "-s", std::to_string(params.seed).c_str(),
-                              "-t", std::to_string(params.n_threads).c_str(),
-                              "-f", get_temp_file_path().c_str(), "-n", std::to_string(params.n_predict).c_str(),
-                              "--top_k", std::to_string(params.top_k).c_str(), "--top_p", std::to_string(params.top_p).c_str(),
-                              "--repeat_last_n", std::to_string(params.repeat_last_n).c_str(), "--repeat_penalty", std::to_string(params.repeat_penalty).c_str(),
-                              "-c", std::to_string(params.n_ctx).c_str(), "--temp", std::to_string(params.temp).c_str());
+    void init() {
+        // Get llama parameters
+        auto lparams = llama_context_default_params();
+        lparams.seed = params.seed;
+        lparams.n_ctx = 2024;
+
+        // Create context
+        llama_init_from_file(params.model.c_str(), lparams);
+
+        // Determine the required inference memory per token
+        const std::vector<llama_token> tmp = { 0, 1, 2, 3 };
+        //llama_eval(ctx, tmp.data(), tmp.size(), 0, params.n_threads);
     }
 
 public:
     LLM(int32_t seed = 0) {
         // Set random seed
         params.seed = seed?seed:time(NULL);
+
+        // Initialize llama
+        init();
     }
 
-    std::string run(std::string_view prompt, const char *end = nullptr, const std::function<bool ()>& on_tick = nullptr) {
+    struct State {
+        std::string fres;
+        std::string end;
+        std::vector<llama_token> embd_inp;
+        std::vector<llama_token> embd;
+        int token_count;
+        int n_ctx;
+        int n_predict;
+        int remaining_tokens;
+        int input_consumed;
+        int n_past;
+        std::vector<llama_token> last_n_tokens;
+    };
+
+    /**
+     * @brief run Runs the inference
+     * @param prompt String to start generation with. Must be null-terminated and should start with a space
+     * @param end String to end generation at
+     * @param on_tick Function to execute every now and then
+     * @return
+     */
+    OwningStringView run(std::string_view prompt, std::string_view end = {nullptr, 0}, const std::function<bool ()>& on_tick = nullptr) {
         std::string fres;
 
-        // Write prompt into file
-        if (!(std::ofstream(get_temp_file_path()) << prompt)) {
-            throw Exception("Failed to write out initial prompt");
-        }
+        // Set end if nullptr
+        end = end.data()?end.data():std::string_view{prompt.data(), 1};
 
-        // Start AI
-        const char prompt_based_end[2] = {prompt[0], '\0'};
-        auto end_length = end?strlen(end):sizeof(prompt_based_end);
-        end = end?end:prompt_based_end;
-        start();
+        // Create buffers for tokens
+        std::vector<llama_token> embd_inp(prompt.size());
+        std::vector<llama_token> embd;
 
-        // Wait for a bit
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        // Run tokenizer
+        auto token_count = llama_tokenize(ctx, prompt.data(), embd_inp.data(), embd_inp.size(), true);
+        embd_inp.resize(token_count);
 
-        // Make sure everything is alright
-        if (!llama.isRunning()) {
-            throw Exception("Llama didn't start. Read stderr for more info.");
-        }
+        // Do some other preparations
+        const auto n_ctx = llama_n_ctx(ctx);
+        const auto n_predict = n_ctx - (int) embd_inp.size();
 
-        // Read until done
-        do {
-            // Receive a byte
-            const auto text = llama.recvStd<1>();
-            // Break on EOF
-            if (text.empty()) break;
-            // Debug
-            putchar(text[0]);
-            fflush(stdout);
-            // Append byte to fres
-            fres.append(std::string_view{text.data(), text.size()});
-            // Check if end is reached
-            auto res = fres.rfind(end);
-            if (res != fres.npos && res > prompt.size()) {
-                break;
+        // Evaluate
+        llama_eval(ctx, embd_inp.data(), embd_inp.size(), 0, params.n_threads);
+
+        // Prepare some other variables
+        int remaining_tokens = n_predict;
+        int input_consumed = 0;
+        int n_past = 0;
+        std::vector<llama_token> last_n_tokens(16);
+        std::fill(last_n_tokens.begin(), last_n_tokens.end(), 0);
+
+        // Loop until done
+        bool abort = false;
+        while (!abort && fres.ends_with(end)) {
+            // Predict
+            if (embd.size() > 0) {
+                if (llama_eval(ctx, embd.data(), embd.size(), n_past, params.n_threads)) {
+                    throw Exception("Failed to eval");
+                }
             }
-            // Tick
-            if (on_tick && !on_tick()) return "";
-        } while (llama.isRunning());
 
-        // Erase end
-        fres.erase(fres.size()-end_length, end_length);
+            n_past += embd.size();
+            embd.clear();
 
-        // Kill llama
-        llama.kill();
+            if ((int) embd_inp.size() <= input_consumed) {
+                // Out of user input, sample next token
+                const float top_k          = params.top_k;
+                const float top_p          = params.top_p;
+                const float temp           = params.temp;
+                const float repeat_penalty = params.repeat_penalty;
 
-        // Return final result
-        std::cout << fres << std::endl;
-        return fres.substr(prompt.size()+1);
+                llama_token id = 0;
+
+                // Get logits and sample
+                {
+                    auto logits = llama_get_logits(ctx);
+
+                    logits[llama_token_eos()] = 0;
+
+                    id = llama_sample_top_p_top_k(ctx, last_n_tokens.data(), last_n_tokens.size(), top_k, top_p, temp, repeat_penalty);
+
+                    last_n_tokens.erase(last_n_tokens.begin());
+                    last_n_tokens.push_back(id);
+                }
+
+                // Add it to the context
+                embd.push_back(id);
+
+                // Decrement remaining sampling budget
+                --remaining_tokens;
+
+                // Tick
+                if (on_tick && !on_tick()) abort = true;
+            } else {
+                // Some user input remains from prompt or interaction, forward it to processing
+                while ((int) embd_inp.size() > input_consumed) {
+                    embd.push_back(embd_inp[input_consumed]);
+                    last_n_tokens.erase(last_n_tokens.begin());
+                    last_n_tokens.push_back(embd_inp[input_consumed]);
+                    ++input_consumed;
+                    if ((int) embd.size() >= params.n_batch) {
+                        break;
+                    }
+                }
+            }
+
+            // Append text to result
+            for (auto id : embd) {
+                // Get token as string
+                const auto str = llama_token_to_str(ctx, id);
+
+                // Append string to result
+                fres.append(str);
+
+                // Debug
+                std::cout << str << std::flush;
+
+                // Tick
+                if (on_tick && !on_tick()) abort = true;
+            }
+        }
+
+        // Return final string
+        return {std::move(fres), std::string_view{fres.data()+prompt.size(), fres.size()-prompt.size()-end.size()}};
     }
 };
 
@@ -148,6 +238,7 @@ class Bot {
     Timer last_message_timer;
     std::shared_ptr<bool> stopping;
     std::mutex reply_lock;
+    LLM llm;
 
     dpp::cluster bot;
     dpp::channel channel;
@@ -161,7 +252,7 @@ class Bot {
         {
             std::ostringstream prompts;
             // Append channel name
-            prompts << "Log des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der gerne mitredet.\n\n";
+            prompts << "Verlauf des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet.\n\n";
             // Append each message to stream
             for (const auto& [id, msg] : history) {
                 bool hide = msg.author.id == bot.me.id;
@@ -194,7 +285,7 @@ class Bot {
             std::string output;
             Timer timeout;
             bool timed_out = false;
-            output = LLM().run(prompt, "\n", [&] () {
+            output = llm.run(prompt, "\n", [&] () {
                 if (timeout.get<std::chrono::minutes>() > 4) {
                     timed_out = true;
                     return false;
@@ -246,9 +337,9 @@ public:
         bot.intents = dpp::i_guild_messages | dpp::i_message_content;
 
         // Set callbacks
-        bot.on_ready([=] (const dpp::ready_t&) {
+        bot.on_ready([=, this] (const dpp::ready_t&) {
             // Get channel
-            bot.channel_get(channel_id, [=] (const dpp::confirmation_callback_t& cbt) {
+            bot.channel_get(channel_id, [=, this] (const dpp::confirmation_callback_t& cbt) {
                 if (cbt.is_error()) {
                     throw std::runtime_error("Failed to get channel: "+cbt.get_error().message);
                 }
@@ -261,7 +352,7 @@ public:
                 idle_auto_reply();
             }).detach();
         });
-        bot.on_message_create([=] (const dpp::message_create_t& event) {
+        bot.on_message_create([=, this] (const dpp::message_create_t& event) {
             // Make sure message source is correct
             if (event.msg.channel_id != channel_id) return;
             // Make sure message has content
@@ -275,7 +366,7 @@ public:
             // Reset last message timer
             last_message_timer.reset();
         });
-        bot.on_message_update([=] (const dpp::message_update_t& event) {
+        bot.on_message_update([=, this] (const dpp::message_update_t& event) {
             // Make sure message source is correct
             if (event.msg.channel_id != channel_id) return;
             // Make sure message has content
@@ -296,6 +387,9 @@ public:
 
 
 int main(int argc, char **argv) {
+    // Init GGML
+    ggml_time_init();
+
     // Check arguments
     if (argc < 3) {
         std::cout << "Usage: " << argv[0] << " <token> <channel>" << std::endl;
