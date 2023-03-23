@@ -133,7 +133,7 @@ public:
             llama_eval(ctx, state.embd.data()+it, 1, it, params.n_threads);
 
             // Tick
-            if (on_tick && !on_tick()) abort = true;
+            if (on_tick && !on_tick()) break;
         }
         std::cout << std::endl;
     }
