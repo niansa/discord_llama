@@ -228,25 +228,29 @@ class Bot {
     void reply() {
         // Start new thread
         std::thread([this] () {
-            // Create placeholder message
-            auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
-            // Trigger LLM  correctly
-            prompt_add_trigger();
-            // Run model
-            Timer timeout;
-            bool timed_out = false;
-            auto output = llm->run("\n", [&] () {
-                if (timeout.get<std::chrono::minutes>() > 2) {
-                    timed_out = true;
-                    std::cerr << "\nWarning: Timeout reached generating message" << std::endl;
-                    return false;
-                }
-                return true;
-            });
-            if (timed_out) output = "Fehler: Zeitüberschreitung";
-            // Send resulting message
-            msg.content = output;
-            bot.message_edit(msg);
+            try {
+                // Create placeholder message
+                auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
+                // Trigger LLM  correctly
+                prompt_add_trigger();
+                // Run model
+                Timer timeout;
+                bool timed_out = false;
+                auto output = llm->run("\n", [&] () {
+                    if (timeout.get<std::chrono::minutes>() > 2) {
+                        timed_out = true;
+                        std::cerr << "\nWarning: Timeout reached generating message" << std::endl;
+                        return false;
+                    }
+                    return true;
+                });
+                if (timed_out) output = "Fehler: Zeitüberschreitung";
+                // Send resulting message
+                msg.content = output;
+                bot.message_edit(msg);
+            } catch (const std::exception& e) {
+                std::cerr << "Warning: " << e.what() << std::endl;
+            }
         }).detach();
     }
 
