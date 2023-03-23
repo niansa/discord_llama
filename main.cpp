@@ -102,7 +102,7 @@ public:
         if (ctx) llama_free(ctx);
     }
 
-    void append(const std::string& prompt) {
+    void append(const std::string& prompt, const std::function<bool ()>& on_tick = nullptr) {
         std::scoped_lock L(lock);
 
         // Check if prompt was empty
@@ -198,7 +198,14 @@ class Bot {
             // Format and append line
             for (const auto line : str_split(msg.content, '\n')) {
                 llm->append(msg.author.username+": ");
-                llm->append(std::string(line));
+                Timer timeout;
+                llm->append(std::string(line), [&] () {
+                    if (timeout.get<std::chrono::minutes>() > 1) {
+                        std::cerr << "\nWarning: Timeout reached processing message" << std::endl;
+                        return false;
+                    }
+                    return true;
+                });
                 llm->append("\n");
             }
         } catch (const LLM::ContextLengthException&) {
@@ -226,8 +233,9 @@ class Bot {
             Timer timeout;
             bool timed_out = false;
             auto output = llm->run("\n", [&] () {
-                if (timeout.get<std::chrono::minutes>() > 4) {
+                if (timeout.get<std::chrono::minutes>() > 2) {
                     timed_out = true;
+                    std::cerr << "\nWarning: Timeout reached generating message" << std::endl;
                     return false;
                 }
                 return true;
