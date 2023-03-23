@@ -47,19 +47,6 @@ void str_replace_in_place(std::string& subject, std::string_view search,
 }
 
 
-class OwningStringView : public std::string_view {
-    std::string owned;
-
-public:
-    OwningStringView(std::string&& str, std::string_view view)
-        : owned(std::move(str)), std::string_view(view) {}
-    OwningStringView(const char *str) : std::string_view(str) {}
-    OwningStringView() : std::string_view("") {}
-
-    using std::string_view::operator[];
-};
-
-
 class LLM {
     struct Exception : public std::runtime_error {
         using std::runtime_error::runtime_error;
@@ -79,15 +66,13 @@ class LLM {
     } params;
 
     struct State {
-        std::string fres;
         std::string prompt;
         std::vector<llama_token> embd;
         int n_ctx;
-        int input_consumed;
-        int n_past;
     } state;
 
     llama_context *ctx;
+    std::mutex lock;
 
     void init() {
         // Get llama parameters
@@ -102,8 +87,6 @@ class LLM {
         puts("32");
 
         // Initialize some variables
-        state.input_consumed = 0;
-        state.n_past = 0;
         state.n_ctx = llama_n_ctx(ctx);
     }
 
@@ -117,6 +100,8 @@ public:
     }
 
     void append(const std::string& prompt) {
+        std::scoped_lock L(lock);
+
         // Check if prompt was empty
         const bool was_empty = state.prompt.empty();
 
@@ -142,17 +127,17 @@ public:
         }
     }
 
-    OwningStringView run(std::string_view end = {nullptr, 0}, const std::function<bool ()>& on_tick = nullptr) {
-        // Set end if nullptr
-        puts("0");
-        end = end.data()?end.data():std::string_view{state.prompt.data(), 1};
+    std::string run(std::string_view end, const std::function<bool ()>& on_tick = nullptr) {
+        std::string fres;
 
         // Loop until done
         puts("6");
         bool abort = false;
-        while (!abort && !(state.fres.ends_with(end) && state.fres.size() > state.prompt.size())) {
+        while (!abort && !fres.ends_with(end)) {
+            std::scoped_lock L(lock);
+
             // Sample top p and top k
-            const auto id = llama_sample_top_p_top_k(ctx, nullptr, 0, 40, 0.8f, 0.2f, 1.f/0.85f);
+            const auto id = llama_sample_top_p_top_k(ctx, nullptr, 0, params.top_k, params.top_p, params.temp, 1.0f);
 
             // Add token
             state.embd.push_back(id);
@@ -160,11 +145,11 @@ public:
             // Get token as string
             const auto str = llama_token_to_str(ctx, id);
 
-            // Append string to result
-            state.fres.append(str);
-
             // Debug
             std::cout << str << std::flush;
+
+            // Append string to function result
+            fres.append(str);
 
             // Evaluate token
             // TODO: Larger batch size
@@ -174,16 +159,11 @@ public:
             if (on_tick && !on_tick()) abort = true;
         }
 
-        // Check final string
-        if (state.fres.size() < state.prompt.size()) {
-            throw Exception("Generation aborted: result seems truncated");
-        }
-
         // Return final string
         puts("23");
-        state.prompt = state.fres;
-        const OwningStringView cut_fres = {std::move(state.fres), std::string_view{state.fres.data()+state.prompt.size(), state.fres.size()-state.prompt.size()-end.size()}};
-        return cut_fres;
+        std::scoped_lock L(lock);
+        state.prompt.append(fres);
+        return std::string(fres.data(), fres.size()-end.size());
     }
 };
 
@@ -192,7 +172,6 @@ class Bot {
     RandomGenerator rng;
     Timer last_message_timer;
     std::shared_ptr<bool> stopping;
-    std::mutex reply_lock;
     LLM llm;
     std::vector<dpp::snowflake> my_messages;
 
@@ -203,13 +182,11 @@ class Bot {
     void prompt_init() {
         llm.append("Verlauf des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet.\n\n");
     }
-    void prompt_add_msg(const dpp::message& msg, bool edited) {
-        // Filter edits that don't reveal bots own messages
-        if (!edited) {
-            if (msg.author.id == bot.me.id) {
-                return;
-            }
-        } else if (msg.author.id != bot.me.id) {
+    void prompt_add_msg(const dpp::message& msg) {
+        // Ignore own messages
+        if (msg.author.id == bot.me.id) {
+            // Add message to list of own messages
+            my_messages.push_back(msg.id);
             return;
         }
         // Format and append line
@@ -224,17 +201,16 @@ class Bot {
     }
 
     void reply() {
-        // Trigger LLM  correctly
-        prompt_add_trigger();
         // Start new thread
         std::thread([this] () {
-            std::scoped_lock L(reply_lock);
             // Create placeholder message
             auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
+            // Trigger LLM  correctly
+            prompt_add_trigger();
             // Run model
             Timer timeout;
             bool timed_out = false;
-            OwningStringView output = llm.run("\n", [&] () {
+            auto output = llm.run("\n", [&] () {
                 if (timeout.get<std::chrono::minutes>() > 4) {
                     timed_out = true;
                     return false;
@@ -245,8 +221,6 @@ class Bot {
             // Send resulting message
             msg.content = output;
             bot.message_edit(msg);
-            // Add message to list of own messages
-            my_messages.push_back(msg.id);
         }).detach();
     }
 
@@ -312,21 +286,11 @@ public:
             // Append message to history
             auto msg = event.msg;
             str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
-            prompt_add_msg(msg, false);
+            prompt_add_msg(msg);
             // Attempt to send a reply
             attempt_reply(msg);
             // Reset last message timer
             last_message_timer.reset();
-        });
-        bot.on_message_update([=, this] (const dpp::message_update_t& event) {
-            // Make sure message source is correct
-            if (event.msg.channel_id != channel_id) return;
-            // Make sure message has content
-            if (event.msg.content.empty()) return;
-            // Update message in history
-            auto msg = event.msg;
-            str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
-            prompt_add_msg(msg, true);
         });
     }
 
