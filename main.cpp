@@ -53,6 +53,8 @@ class OwningStringView : public std::string_view {
 public:
     OwningStringView(std::string&& str, std::string_view view)
         : owned(std::move(str)), std::string_view(view) {}
+    OwningStringView(const char *str) : std::string_view(str) {}
+    OwningStringView() : std::string_view("") {}
 
     using std::string_view::operator[];
 };
@@ -86,16 +88,20 @@ class LLM {
 
     void init() {
         // Get llama parameters
+        puts("30");
         auto lparams = llama_context_default_params();
         lparams.seed = params.seed;
         lparams.n_ctx = 2024;
 
         // Create context
-        llama_init_from_file(params.model.c_str(), lparams);
+        puts("31");
+        ctx = llama_init_from_file(params.model.c_str(), lparams);
 
         // Determine the required inference memory per token
+        puts("32");
         const std::vector<llama_token> tmp = { 0, 1, 2, 3 };
-        //llama_eval(ctx, tmp.data(), tmp.size(), 0, params.n_threads);
+        llama_eval(ctx, tmp.data(), tmp.size(), 0, params.n_threads);
+        puts("33");
     }
 
 public:
@@ -132,24 +138,30 @@ public:
         std::string fres;
 
         // Set end if nullptr
+        puts("0");
         end = end.data()?end.data():std::string_view{prompt.data(), 1};
 
         // Create buffers for tokens
+        puts("1");
         std::vector<llama_token> embd_inp(prompt.size());
         std::vector<llama_token> embd;
 
         // Run tokenizer
+        puts("2");
         auto token_count = llama_tokenize(ctx, prompt.data(), embd_inp.data(), embd_inp.size(), true);
         embd_inp.resize(token_count);
 
         // Do some other preparations
+        puts("3");
         const auto n_ctx = llama_n_ctx(ctx);
         const auto n_predict = n_ctx - (int) embd_inp.size();
 
         // Evaluate
+        puts("4");
         llama_eval(ctx, embd_inp.data(), embd_inp.size(), 0, params.n_threads);
 
         // Prepare some other variables
+        puts("5");
         int remaining_tokens = n_predict;
         int input_consumed = 0;
         int n_past = 0;
@@ -157,8 +169,9 @@ public:
         std::fill(last_n_tokens.begin(), last_n_tokens.end(), 0);
 
         // Loop until done
+        puts("6");
         bool abort = false;
-        while (!abort && fres.ends_with(end)) {
+        while (!abort && !fres.ends_with(end)) {
             // Predict
             if (embd.size() > 0) {
                 if (llama_eval(ctx, embd.data(), embd.size(), n_past, params.n_threads)) {
@@ -227,7 +240,13 @@ public:
             }
         }
 
+        // Check final string
+        if (fres.size() < prompt.size()) {
+            throw Exception("Unknown error: result seems truncated");
+        }
+
         // Return final string
+        puts("23");
         return {std::move(fres), std::string_view{fres.data()+prompt.size(), fres.size()-prompt.size()-end.size()}};
     }
 };
@@ -282,10 +301,9 @@ class Bot {
             // Create placeholder message
             auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
             // Run model
-            std::string output;
             Timer timeout;
             bool timed_out = false;
-            output = llm.run(prompt, "\n", [&] () {
+            OwningStringView output = llm.run(prompt, "\n", [&] () {
                 if (timeout.get<std::chrono::minutes>() > 4) {
                     timed_out = true;
                     return false;
