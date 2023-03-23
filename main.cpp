@@ -96,12 +96,7 @@ class LLM {
         // Create context
         puts("31");
         ctx = llama_init_from_file(params.model.c_str(), lparams);
-
-        // Determine the required inference memory per token
         puts("32");
-        const std::vector<llama_token> tmp = { 0, 1, 2, 3 };
-        llama_eval(ctx, tmp.data(), tmp.size(), 0, params.n_threads);
-        puts("33");
     }
 
 public:
@@ -155,10 +150,6 @@ public:
         puts("3");
         const auto n_ctx = llama_n_ctx(ctx);
         const auto n_predict = n_ctx - (int) embd_inp.size();
-
-        // Evaluate
-        puts("4");
-        llama_eval(ctx, embd_inp.data(), embd_inp.size(), 0, params.n_threads);
 
         // Prepare some other variables
         puts("5");
