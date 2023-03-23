@@ -315,13 +315,16 @@ public:
                 my_messages.push_back(event.msg.id);
                 return;
             }
-            // Replace bot mentions with bot username
-            auto msg = event.msg;
-            str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
-            // Attempt to send a reply
-            attempt_reply(msg);
-            // Append message to history
-            prompt_add_msg(msg);
+            // Move on in another thread
+            std::thread([=, this] () {
+                // Replace bot mentions with bot username
+                auto msg = event.msg;
+                str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
+                // Attempt to send a reply
+                attempt_reply(msg);
+                // Append message to history
+                prompt_add_msg(msg);
+            });
             // Reset last message timer
             last_message_timer.reset();
         });
