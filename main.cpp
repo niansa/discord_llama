@@ -131,6 +131,9 @@ public:
         for (int it = old_token_count; it != old_token_count+token_count; it++) {
             std::cout << llama_token_to_str(ctx, state.embd.data()[it]) << std::flush;
             llama_eval(ctx, state.embd.data()+it, 1, it, params.n_threads);
+
+            // Tick
+            if (on_tick && !on_tick()) abort = true;
         }
         std::cout << std::endl;
     }
