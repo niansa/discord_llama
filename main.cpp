@@ -48,10 +48,6 @@ void str_replace_in_place(std::string& subject, std::string_view search,
 
 
 class LLM {
-    struct Exception : public std::runtime_error {
-        using std::runtime_error::runtime_error;
-    };
-
     struct {
         std::string model = "7B-ggml-model-quant.bin";
 
@@ -94,6 +90,14 @@ class LLM {
     }
 
 public:
+    struct Exception : public std::runtime_error {
+        using std::runtime_error::runtime_error;
+    };
+    struct ContextLengthException : public Exception {
+        ContextLengthException() : Exception("Max. context length exceeded") {}
+    };
+
+
     LLM(int32_t seed = 0) {
         // Set random seed
         params.seed = seed?seed:time(NULL);
@@ -124,6 +128,12 @@ public:
         puts("bbbb");
         const auto token_count = llama_tokenize(ctx, prompt.data(), state.embd.data()+old_token_count, state.embd.size()-old_token_count, was_empty);
         state.embd.resize(old_token_count+token_count);
+
+        // Make sure limit is far from being hit
+        if (token_count > state.n_ctx-6) {
+            // Yup. *this MUST be decomposed now.
+            throw ContextLengthException();
+        }
 
         // Evaluate new tokens
         // TODO: Larger batch size
@@ -177,32 +187,43 @@ class Bot {
     RandomGenerator rng;
     Timer last_message_timer;
     std::shared_ptr<bool> stopping;
-    LLM llm;
+    std::unique_ptr<LLM> llm;
     std::vector<dpp::snowflake> my_messages;
+    std::mutex llm_init_lock;
 
     dpp::cluster bot;
     dpp::channel channel;
     dpp::snowflake channel_id;
 
-    void prompt_init() {
-        llm.append("Verlauf des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet.\n\n");
+    void llm_init() {
+        if (!llm) {
+            {
+                std::unique_lock L(llm_init_lock);
+                llm = std::make_unique<LLM>();
+            }
+            llm->append("Verlauf des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet.\n\n");
+        }
     }
     void prompt_add_msg(const dpp::message& msg) {
-        // Ignore own messages
-        if (msg.author.id == bot.me.id) {
-            // Add message to list of own messages
-            my_messages.push_back(msg.id);
-            return;
-        }
-        // Format and append line
-        for (const auto line : str_split(msg.content, '\n')) {
-            llm.append(msg.author.username+": ");
-            llm.append(std::string(line));
-            llm.append("\n");
+        try {
+            // Format and append line
+            for (const auto line : str_split(msg.content, '\n')) {
+                llm->append(msg.author.username+": ");
+                llm->append(std::string(line));
+                llm->append("\n");
+            }
+        } catch (const LLM::ContextLengthException&) {
+            llm.reset();
+            llm_init();
         }
     }
     void prompt_add_trigger() {
-        llm.append(bot.me.username+':');
+        try {
+            llm->append(bot.me.username+':');
+        } catch (const LLM::ContextLengthException&) {
+            llm.reset();
+            llm_init();
+        }
     }
 
     void reply() {
@@ -215,7 +236,7 @@ class Bot {
             // Run model
             Timer timeout;
             bool timed_out = false;
-            auto output = llm.run("\n", [&] () {
+            auto output = llm->run("\n", [&] () {
                 if (timeout.get<std::chrono::minutes>() > 4) {
                     timed_out = true;
                     return false;
@@ -276,7 +297,7 @@ public:
                 // Initialize random generator
                 rng.seed(bot.me.id);
                 // Append initial prompt
-                prompt_init();
+                llm_init();
                 // Start idle auto reply thread
                 std::thread([this] () {
                     idle_auto_reply();
@@ -288,12 +309,19 @@ public:
             if (event.msg.channel_id != channel_id) return;
             // Make sure message has content
             if (event.msg.content.empty()) return;
-            // Append message to history
+            // Ignore own messages
+            if (event.msg.author.id == bot.me.id) {
+                // Add message to list of own messages
+                my_messages.push_back(event.msg.id);
+                return;
+            }
+            // Replace bot mentions with bot username
             auto msg = event.msg;
             str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
-            prompt_add_msg(msg);
             // Attempt to send a reply
             attempt_reply(msg);
+            // Append message to history
+            prompt_add_msg(msg);
             // Reset last message timer
             last_message_timer.reset();
         });
