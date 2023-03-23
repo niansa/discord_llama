@@ -71,7 +71,7 @@ class LLM {
         int n_ctx;
     } state;
 
-    llama_context *ctx;
+    llama_context *ctx = nullptr;
     std::mutex lock;
 
     void init() {
@@ -84,6 +84,9 @@ class LLM {
         // Create context
         puts("31");
         ctx = llama_init_from_file(params.model.c_str(), lparams);
+        if (!ctx) {
+            throw Exception("Failed to initialize llama from file");
+        }
         puts("32");
 
         // Initialize some variables
@@ -97,6 +100,9 @@ public:
 
         // Initialize llama
         init();
+    }
+    ~LLM() {
+        if (ctx) llama_free(ctx);
     }
 
     void append(const std::string& prompt) {
@@ -136,7 +142,6 @@ public:
         puts("6");
         bool abort = false;
         while (!abort && !fres.ends_with(end)) {
-
             // Sample top p and top k
             const auto id = llama_sample_top_p_top_k(ctx, nullptr, 0, params.top_k, params.top_p, params.temp, 1.0f);
 
