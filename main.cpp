@@ -162,7 +162,7 @@ public:
         // Loop until done
         puts("6");
         bool abort = false;
-        while (!abort && !fres.ends_with(end)) {
+        while (!abort && !(fres.ends_with(end) && fres.size() > prompt.size())) {
             // Predict
             if (embd.size() > 0) {
                 if (llama_eval(ctx, embd.data(), embd.size(), n_past, params.n_threads)) {
