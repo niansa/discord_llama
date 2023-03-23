@@ -197,7 +197,7 @@ class Bot {
         }
     }
     void prompt_add_trigger() {
-        llm.append(bot.me.username+": ");
+        llm.append(bot.me.username+':');
     }
 
     void reply() {
