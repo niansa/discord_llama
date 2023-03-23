@@ -72,18 +72,15 @@ class LLM {
 
     void init() {
         // Get llama parameters
-        puts("30");
         auto lparams = llama_context_default_params();
         lparams.seed = params.seed;
         lparams.n_ctx = 2024;
 
         // Create context
-        puts("31");
         ctx = llama_init_from_file(params.model.c_str(), lparams);
         if (!ctx) {
             throw Exception("Failed to initialize llama from file");
         }
-        puts("32");
 
         // Initialize some variables
         state.n_ctx = llama_n_ctx(ctx);
@@ -116,16 +113,13 @@ public:
         const bool was_empty = state.prompt.empty();
 
         // Append to current prompt
-        printf("ddd %s\n", prompt.c_str());
         state.prompt.append(prompt);
 
         // Resize buffer for tokens
-        puts("cccc");
         const auto old_token_count = state.embd.size();
         state.embd.resize(old_token_count+state.prompt.size()+1);
 
         // Run tokenizer
-        puts("bbbb");
         const auto token_count = llama_tokenize(ctx, prompt.data(), state.embd.data()+old_token_count, state.embd.size()-old_token_count, was_empty);
         state.embd.resize(old_token_count+token_count);
 
@@ -137,11 +131,12 @@ public:
 
         // Evaluate new tokens
         // TODO: Larger batch size
-        printf("aaa %lu+%d=%lu\n", old_token_count, token_count, old_token_count+token_count);
+        std::cout << "Context size: " << old_token_count << '+' << token_count << '=' << old_token_count+token_count << std::endl;
         for (int it = old_token_count; it != old_token_count+token_count; it++) {
-            printf("aaa %i %s\n", it, llama_token_to_str(ctx, state.embd.data()[it]));
+            std::cout << llama_token_to_str(ctx, state.embd.data()[it]) << std::flush;
             llama_eval(ctx, state.embd.data()+it, 1, it, params.n_threads);
         }
+        std::cout << std::endl;
     }
 
     std::string run(std::string_view end, const std::function<bool ()>& on_tick = nullptr) {
@@ -149,7 +144,6 @@ public:
         std::string fres;
 
         // Loop until done
-        puts("6");
         bool abort = false;
         while (!abort && !fres.ends_with(end)) {
             // Sample top p and top k
@@ -176,7 +170,6 @@ public:
         }
 
         // Return final string
-        puts("23");
         state.prompt.append(fres);
         return std::string(fres.data(), fres.size()-end.size());
     }
