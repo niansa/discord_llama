@@ -316,15 +316,18 @@ public:
                 return;
             }
             // Move on in another thread
-            std::thread([=, this] () {
-                // Replace bot mentions with bot username
-                auto msg = event.msg;
-                str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
-                // Attempt to send a reply
-                attempt_reply(msg);
-                // Append message to history
-                prompt_add_msg(msg);
-            });
+            std::thread([this, msg = event.msg] () mutable {
+                try {
+                    // Replace bot mentions with bot username
+                    str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
+                    // Attempt to send a reply
+                    attempt_reply(msg);
+                    // Append message to history
+                    prompt_add_msg(msg);
+                } catch (const std::exception& e) {
+                    std::cerr << "Warning: " << e.what() << std::endl;
+                }
+            }).detach();
             // Reset last message timer
             last_message_timer.reset();
         });
