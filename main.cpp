@@ -17,10 +17,6 @@
 #include <ggml.h>
 #include <llama.h>
 
-#ifndef _POSIX_VERSION
-#   error "Not compatible with non-POSIX systems"
-#endif
-
 
 
 static
