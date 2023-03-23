@@ -120,6 +120,7 @@ public:
         state.embd.resize(old_token_count+token_count);
 
         // Evaluate new tokens
+        // TODO: Larger batch size
         printf("aaa %lu+%d=%lu\n", old_token_count, token_count, old_token_count+token_count);
         for (int it = old_token_count; it != old_token_count+token_count; it++) {
             printf("aaa %i %s\n", it, llama_token_to_str(ctx, state.embd.data()[it]));
@@ -128,13 +129,13 @@ public:
     }
 
     std::string run(std::string_view end, const std::function<bool ()>& on_tick = nullptr) {
+        std::scoped_lock L(lock);
         std::string fres;
 
         // Loop until done
         puts("6");
         bool abort = false;
         while (!abort && !fres.ends_with(end)) {
-            std::scoped_lock L(lock);
 
             // Sample top p and top k
             const auto id = llama_sample_top_p_top_k(ctx, nullptr, 0, params.top_k, params.top_p, params.temp, 1.0f);
@@ -161,7 +162,6 @@ public:
 
         // Return final string
         puts("23");
-        std::scoped_lock L(lock);
         state.prompt.append(fres);
         return std::string(fres.data(), fres.size()-end.size());
     }
