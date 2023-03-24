@@ -102,7 +102,7 @@ public:
         if (ctx) llama_free(ctx);
     }
 
-    void append(const std::string& prompt, const std::function<bool ()>& on_tick = nullptr) {
+    void append(const std::string& prompt, const std::function<bool (float progress)>& on_tick = nullptr) {
         std::scoped_lock L(lock);
 
         // Check if prompt was empty
@@ -133,7 +133,12 @@ public:
             llama_eval(ctx, state.embd.data()+it, 1, it, params.n_threads);
 
             // Tick
-            if (on_tick && !on_tick()) break;
+            if (on_tick) {
+                // Calculate progress
+                auto progress = float(it) / (state.embd.size()) * 100.f;
+                // Run callback
+                if (!on_tick(progress)) break;
+            }
         }
         std::cout << std::endl;
     }
@@ -187,13 +192,54 @@ class Bot {
     dpp::channel channel;
     dpp::snowflake channel_id;
 
+    inline static
+    std::string create_text_progress_indicator(uint8_t percentage) {
+        constexpr uint8_t divisor = 3,
+                          width = 100 / divisor;
+        // Initialize string
+        std::string fres = "`[";
+        fres.reserve(width+4);
+        // Append progress
+        uint8_t bars = percentage / divisor;
+        for (uint8_t it = 0; it != width; it++) {
+            if (it <= bars) fres.push_back('#');
+            else fres.push_back(' ');
+        }
+        // Finalize and return string
+        fres.append("]`");
+        return fres;
+    }
+
     void llm_init() {
         if (!llm) {
+            // Make sure llm is initialized
             {
                 std::unique_lock L(llm_init_lock);
                 llm = std::make_unique<LLM>();
             }
-            llm->append("Verlauf des #"+channel.name+" Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet.\n\n");
+            // Create message for reporting progress
+            dpp::message msg(channel_id, "Wird geladen...");
+            bot.message_create(msg, [this] (const dpp::confirmation_callback_t& cbt) {
+                // Error check
+                if (cbt.is_error()) {
+                    throw std::runtime_error("Failed to send message to channel: "+cbt.get_error().message);
+                }
+                // Callback for reporting progress
+                Timer timer;
+                auto msg = cbt.get<dpp::message>();
+                auto cb = [&, this] (float progress) mutable {
+                    if (timer.get<std::chrono::seconds>() > 5) {
+                        msg.content = "Wird geladen... "+create_text_progress_indicator(progress);
+                        bot.message_edit(msg);
+                        timer.reset();
+                    }
+                    return true;
+                };
+                // Add initial context
+                llm->append("Verlauf des #"+channel.name+" Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet. Er ist freundlich, hilfsbereit und antwortet immer praezise und genau in einer Nachricht. Er macht gerne Witze und mag jeden. Sein Alter ist 16 und das aktuelle Jahr ist 2023.\n\n", cb);
+                // Delete progress message
+                bot.message_delete(msg.id, msg.channel_id);
+            });
         }
     }
     void prompt_add_msg(const dpp::message& msg) {
@@ -201,7 +247,7 @@ class Bot {
             // Format and append line
             for (const auto line : str_split(msg.content, '\n')) {
                 Timer timeout;
-                llm->append(msg.author.username+": "+std::string(line)+'\n', [&] () {
+                llm->append(msg.author.username+": "+std::string(line)+'\n', [&] (float) {
                     if (timeout.get<std::chrono::minutes>() > 1) {
                         std::cerr << "\nWarning: Timeout reached processing message" << std::endl;
                         return false;
