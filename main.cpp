@@ -200,16 +200,14 @@ class Bot {
         try {
             // Format and append line
             for (const auto line : str_split(msg.content, '\n')) {
-                llm->append(msg.author.username+": ");
                 Timer timeout;
-                llm->append(std::string(line), [&] () {
+                llm->append(msg.author.username+": "+std::string(line)+'\n', [&] () {
                     if (timeout.get<std::chrono::minutes>() > 1) {
                         std::cerr << "\nWarning: Timeout reached processing message" << std::endl;
                         return false;
                     }
                     return true;
                 });
-                llm->append("\n");
             }
         } catch (const LLM::ContextLengthException&) {
             llm.reset();
