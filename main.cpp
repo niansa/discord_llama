@@ -121,15 +121,15 @@ public:
         state.embd.resize(old_token_count+token_count);
 
         // Make sure limit is far from being hit
-        if (token_count > state.n_ctx-6) {
+        if (state.embd.size() > state.n_ctx-6) {
             // Yup. *this MUST be decomposed now.
             throw ContextLengthException();
         }
 
         // Evaluate new tokens
         // TODO: Larger batch size
-        std::cout << "Context size: " << old_token_count << '+' << token_count << '=' << old_token_count+token_count << '/' << state.n_ctx << std::endl;
-        for (int it = old_token_count; it != old_token_count+token_count; it++) {
+        std::cout << "Context size: " << old_token_count << '+' << token_count << '=' << state.embd.size() << '/' << state.n_ctx << std::endl;
+        for (int it = old_token_count; it != state.embd.size(); it++) {
             std::cout << llama_token_to_str(ctx, state.embd.data()[it]) << std::flush;
             llama_eval(ctx, state.embd.data()+it, 1, it, params.n_threads);
 
