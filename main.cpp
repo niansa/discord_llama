@@ -313,6 +313,8 @@ public:
             if (event.msg.channel_id != channel_id) return;
             // Make sure message has content
             if (event.msg.content.empty()) return;
+            // Reset last message timer
+            last_message_timer.reset();
             // Ignore own messages
             if (event.msg.author.id == bot.me.id) {
                 // Add message to list of own messages
@@ -332,8 +334,6 @@ public:
                     std::cerr << "Warning: " << e.what() << std::endl;
                 }
             }).detach();
-            // Reset last message timer
-            last_message_timer.reset();
         });
     }
 
