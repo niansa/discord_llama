@@ -241,7 +241,8 @@ class Bot {
                     uint8_t progress_i = progress;
                     if (timer.get<std::chrono::seconds>() > 5) {
                         msg.content = "Wird geladen... "+create_text_progress_indicator(progress_i)+"\n"
-                                      "> **"+std::to_string(progress_i)+"%** (**"+std::to_string((progress_i-last_progress)/5)+"%/s**)";
+                                      "> **"+std::to_string(progress_i)+"**% (**"+std::to_string((progress_i-last_progress)/5)+"**%/s)";
+                        last_progress = progress_i;
                         bot.message_edit(msg);
                         timer.reset();
                     }
