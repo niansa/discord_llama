@@ -245,7 +245,7 @@ class Bot {
                     return true;
                 };
                 // Add initial context
-                llm->append("Verlauf des #"+channel.name+" Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet. Er ist freundlich, hilfsbereit und antwortet immer sofort, praezise und genau in einer Nachricht. Er macht gerne Witze und mag jeden. Sein Alter ist 16 und er wurde 2007 geboren.\n"
+                llm->append("Verlauf des #"+channel.name+" Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet. Er ist freundlich, hilfsbereit und antwortet immer sofort, präzise und ausführlich in einer Nachricht. Er macht gerne Witze und mag jeden. Sein Alter ist 16 und er wurde 2007 geboren.\n"
                             "\n"
                             "Hexxe: Was ist dein Lieblingsspiel?\n"
                             +bot.me.username+": Mein Lieblingsspiel ist Minecraft!\n", cb);
