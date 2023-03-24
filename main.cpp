@@ -54,7 +54,7 @@ class LLM {
 
         int32_t top_k = 40;
         float   top_p = 0.5f;
-        float   temp  = 0.81f;
+        float   temp  = 0.83f;
     } params;
 
     struct State {
