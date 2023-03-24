@@ -9,6 +9,7 @@
 #include <thread>
 #include <chrono>
 #include <functional>
+#include <array>
 #include <vector>
 #include <map>
 #include <mutex>
@@ -194,29 +195,31 @@ class Bot {
 
     inline static
     std::string create_text_progress_indicator(uint8_t percentage) {
-        constexpr uint8_t divisor = 3,
-                          width = 100 / divisor;
+        static constexpr uint8_t divisor = 3,
+                                 width = 100 / divisor;
+        // Progress bar percentage lookup
+        const static auto indicator_lookup = [] () consteval {
+            std::array<uint8_t, 101> fres;
+            for (uint8_t it = 0; it != 101; it++) {
+                fres[it] = it / divisor;
+            }
+            return fres;
+        }();
         // Initialize string
-        std::ostringstream s;
-        s << "`[";
+        std::string fres;
+        fres.resize(width+4);
+        fres[0] = '`';
+        fres[1] = '[';
         // Append progress
-        uint8_t bars = percentage / divisor;
+        const uint8_t bars = indicator_lookup[percentage];
         for (uint8_t it = 0; it != width; it++) {
-            if (it <= bars) s << '#';
-            else s << ' ';
+            if (it < bars) fres[it+2] = '#';
+            else fres[it+2] = ' ';
         }
         // Finalize and return string
-        s << "]`";
-        return s.str();
-    }
-
-    inline static
-    std::string get_timestamp() {
-        std::time_t t = std::time(nullptr);
-        std::tm tm = *std::localtime(&t);
-        std::ostringstream s;
-        s << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
-        return s.str();
+        fres[width+2] = ']';
+        fres[width+3] = '`';
+        return fres;
     }
 
     void llm_init() {
@@ -227,7 +230,7 @@ class Bot {
                 llm = std::make_unique<LLM>();
             }
             // Create message for reporting progress
-            dpp::message msg(channel_id, "Wird geladen...");
+            dpp::message msg(channel_id, "Wird initialisiert...");
             bot.message_create(msg, [this] (const dpp::confirmation_callback_t& cbt) {
                 // Error check
                 if (cbt.is_error()) {
@@ -240,8 +243,8 @@ class Bot {
                 auto cb = [&, this] (float progress) mutable {
                     uint8_t progress_i = progress;
                     if (timer.get<std::chrono::seconds>() > 5) {
-                        msg.content = "Wird geladen... "+create_text_progress_indicator(progress_i)+"\n"
-                                      "> **"+std::to_string(progress_i)+"**% (**"+std::to_string((progress_i-last_progress)/5)+"**%/s)";
+                        msg.content = "Wird geladen... "+create_text_progress_indicator(progress_i)+
+                                      " **"+std::to_string(progress_i)+"**% (**"+std::to_string((progress_i-last_progress)/5)+"**%/s)";
                         last_progress = progress_i;
                         bot.message_edit(msg);
                         timer.reset();
