@@ -193,7 +193,7 @@ class Bot {
                 std::unique_lock L(llm_init_lock);
                 llm = std::make_unique<LLM>();
             }
-            llm->append("Verlauf des #chat Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet.\n\n");
+            llm->append("Verlauf des #"+channel.name+" Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet.\n\n");
         }
     }
     void prompt_add_msg(const dpp::message& msg) {
