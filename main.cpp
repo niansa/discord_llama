@@ -236,9 +236,12 @@ class Bot {
                 // Callback for reporting progress
                 Timer timer;
                 auto msg = cbt.get<dpp::message>();
+                uint8_t last_progress = 0;
                 auto cb = [&, this] (float progress) mutable {
+                    uint8_t progress_i = progress;
                     if (timer.get<std::chrono::seconds>() > 5) {
-                        msg.content = "Wird geladen... "+create_text_progress_indicator(progress);
+                        msg.content = "Wird geladen... "+create_text_progress_indicator(progress_i)+"\n"
+                                      "> **"+std::to_string(progress_i)+"%** (**"+std::to_string((progress_i-last_progress)/5)+"%/s**)";
                         bot.message_edit(msg);
                         timer.reset();
                     }
