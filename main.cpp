@@ -379,10 +379,17 @@ public:
                 try {
                     // Replace bot mentions with bot username
                     str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
-                    // Attempt to send a reply
-                    attempt_reply(msg);
-                    // Append message to history
-                    prompt_add_msg(msg);
+                    if (msg.content == "!trigger") {
+                        // Delete message
+                        bot.message_delete(msg.id, msg.channel_id);
+                        // Send a reply
+                        reply();
+                    } else {
+                        // Attempt to send a reply
+                        attempt_reply(msg);
+                        // Append message to history
+                        prompt_add_msg(msg);
+                    }
                 } catch (const std::exception& e) {
                     std::cerr << "Warning: " << e.what() << std::endl;
                 }
