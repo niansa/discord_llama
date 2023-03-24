@@ -68,10 +68,16 @@ class LLM {
     std::mutex lock;
 
     static inline
-    std::string remove_nonascii(const std::string& str) {
+    std::string clean_string(const std::string& str) {
         std::string fres;
         for (const auto c : str) {
-            if (c >= 0x20 && c <= 0x7E) fres.push_back(c);
+            if (c >= 0x20 && c <= 0x7E
+             || c == "ä"[0] || c == "ä"[1] || c == "ä"[2]
+             || c == "ö"[0] || c == "ö"[1] || c == "ö"[2]
+             || c == "ü"[0] || c == "ü"[1] || c == "ü"[2]
+             || c == "ß"[0] || c == "ß"[1] || c == "ß"[2]) {
+                fres.push_back(c);
+            }
         }
         return fres;
     }
@@ -116,7 +122,7 @@ public:
         std::scoped_lock L(lock);
 
         // Remove non-printables
-        prompt = remove_nonascii(prompt);
+        prompt = clean_string(prompt);
 
         // Check if prompt was empty
         const bool was_empty = state.prompt.empty();
