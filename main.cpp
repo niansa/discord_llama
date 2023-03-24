@@ -197,7 +197,8 @@ class Bot {
         constexpr uint8_t divisor = 3,
                           width = 100 / divisor;
         // Initialize string
-        std::ostringstream s("`[");
+        std::ostringstream s;
+        s << "`[";
         // Append progress
         uint8_t bars = percentage / divisor;
         for (uint8_t it = 0; it != width; it++) {
