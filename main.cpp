@@ -197,17 +197,25 @@ class Bot {
         constexpr uint8_t divisor = 3,
                           width = 100 / divisor;
         // Initialize string
-        std::string fres = "`[";
-        fres.reserve(width+4);
+        std::ostringstream s("`[");
         // Append progress
         uint8_t bars = percentage / divisor;
         for (uint8_t it = 0; it != width; it++) {
-            if (it <= bars) fres.push_back('#');
-            else fres.push_back(' ');
+            if (it <= bars) s << '#';
+            else s << ' ';
         }
         // Finalize and return string
-        fres.append("]`");
-        return fres;
+        s << "]`";
+        return s.str();
+    }
+
+    inline static
+    std::string get_timestamp() {
+        std::time_t t = std::time(nullptr);
+        std::tm tm = *std::localtime(&t);
+        std::ostringstream s;
+        s << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+        return s.str();
     }
 
     void llm_init() {
@@ -236,7 +244,7 @@ class Bot {
                     return true;
                 };
                 // Add initial context
-                llm->append("Verlauf des #"+channel.name+" Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet. Er ist freundlich, hilfsbereit und antwortet immer praezise und genau in einer Nachricht. Er macht gerne Witze und mag jeden. Sein Alter ist 16, das aktuelle Jahr ist 2023 und er wurde 2007 geboren.\n\n", cb);
+                llm->append("Verlauf des #"+channel.name+" Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet. Er ist freundlich, hilfsbereit und antwortet immer praezise und genau in einer Nachricht. Er macht gerne Witze und mag jeden. Sein Alter ist 16 und er wurde 2007 geboren.\n\n", cb);
                 // Delete progress message
                 bot.message_delete(msg.id, msg.channel_id);
             });
@@ -247,7 +255,7 @@ class Bot {
             // Format and append line
             for (const auto line : str_split(msg.content, '\n')) {
                 Timer timeout;
-                llm->append(msg.author.username+": "+std::string(line)+'\n', [&] (float) {
+                llm->append('['+get_timestamp()+"] "+msg.author.username+": "+std::string(line)+'\n', [&] (float) {
                     if (timeout.get<std::chrono::minutes>() > 1) {
                         std::cerr << "\nWarning: Timeout reached processing message" << std::endl;
                         return false;
