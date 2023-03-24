@@ -256,7 +256,7 @@ class Bot {
             // Format and append line
             for (const auto line : str_split(msg.content, '\n')) {
                 Timer timeout;
-                llm->append('['+get_timestamp()+"] "+msg.author.username+": "+std::string(line)+'\n', [&] (float) {
+                llm->append(msg.author.username+": "+std::string(line)+'\n', [&] (float) {
                     if (timeout.get<std::chrono::minutes>() > 1) {
                         std::cerr << "\nWarning: Timeout reached processing message" << std::endl;
                         return false;
@@ -271,7 +271,7 @@ class Bot {
     }
     void prompt_add_trigger() {
         try {
-            llm->append('['+get_timestamp()+"] "+bot.me.username+':');
+            llm->append(bot.me.username+':');
         } catch (const LLM::ContextLengthException&) {
             llm.reset();
             llm_init();
