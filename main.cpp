@@ -271,7 +271,7 @@ class Bot {
     }
     void prompt_add_trigger() {
         try {
-            llm->append(bot.me.username+':');
+            llm->append('['+get_timestamp()+"] "+bot.me.username+':');
         } catch (const LLM::ContextLengthException&) {
             llm.reset();
             llm_init();
