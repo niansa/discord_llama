@@ -55,7 +55,7 @@ class LLM {
 
         int32_t top_k = 40;
         float   top_p = 0.5f;
-        float   temp  = 0.9f;
+        float   temp  = 0.83f;
     } params;
 
     struct State {
@@ -66,6 +66,15 @@ class LLM {
 
     llama_context *ctx = nullptr;
     std::mutex lock;
+
+    static inline
+    std::string remove_nonascii(const std::string& str) {
+        std::string fres;
+        for (const auto c : str) {
+            if (c >= 0x20 && c <= 0x7E) fres.push_back(c);
+        }
+        return fres;
+    }
 
     void init() {
         // Get llama parameters
@@ -103,8 +112,11 @@ public:
         if (ctx) llama_free(ctx);
     }
 
-    void append(const std::string& prompt, const std::function<bool (float progress)>& on_tick = nullptr) {
+    void append(std::string prompt, const std::function<bool (float progress)>& on_tick = nullptr) {
         std::scoped_lock L(lock);
+
+        // Remove non-printables
+        prompt = remove_nonascii(prompt);
 
         // Check if prompt was empty
         const bool was_empty = state.prompt.empty();
