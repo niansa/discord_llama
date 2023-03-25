@@ -55,7 +55,7 @@ class LLM {
 
         int32_t top_k = 40;
         float   top_p = 0.5f;
-        float   temp  = 0.83f;
+        float   temp  = 0.72f;
 
         bool no_repeat = true;
     } params;
@@ -136,6 +136,9 @@ public:
         // Append to current prompt
         state.prompt.append(prompt);
 
+        // Debug
+        std::ofstream("prompt.txt") << state.prompt;
+
         // Resize buffer for tokens
         const auto old_token_count = state.embd.size();
         state.embd.resize(old_token_count+state.prompt.size()+1);
@@ -176,8 +179,8 @@ public:
         bool abort = false;
         while (!abort && !fres.ends_with(end)) {
             // Sample top p and top k
-            bool has_repeated = state.repeats>4;
-            const auto id = llama_sample_top_p_top_k(ctx, has_repeated?(state.embd.data()+state.embd.size()-64):nullptr, has_repeated?64:0, params.top_k, params.top_p, params.temp, has_repeated?1.7f:1.0f);
+            bool has_repeated = state.repeats>=4;
+            const auto id = llama_sample_top_p_top_k(ctx, nullptr, 0, params.top_k, has_repeated?(params.top_p+0.15f):params.top_p, has_repeated?(params.temp+0.4f):params.temp, 1.0f);
 
             // Add token
             state.embd.push_back(id);
@@ -192,7 +195,7 @@ public:
             fres.append(str);
 
             // Evaluate token
-            // TODO: Respect batch size
+            //  TODO: Respect batch size
             llama_eval(ctx, state.embd.data()+state.embd.size()-1, 1, state.embd.size()-1, params.n_threads);
 
             // Tick
