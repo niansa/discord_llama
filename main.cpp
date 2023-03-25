@@ -290,10 +290,8 @@ class Bot {
                 // Add initial context
                 llm->append("Verlauf des #"+channel.name+" Kanals.\n"
                             "Notiz 1: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet. Er ist freundlich und hilfsbereit und antwortet immer sofort. Er hat guten Humor und mag jeden. Sein Alter ist 16 und er wurde 2007 geboren.\n"
-                            "Notiz 2: Ecki heisst in Wirklichkeit Eckhard Kohlhuber und kommt aus Bayern."
-                            "\n"
-                            "Hexxe: Was ist dein Lieblingsspiel?\n"
-                            +bot.me.username+": Ich spiele gerne Minecraft\n", cb);
+                            "Notiz 2: Ecki heisst in Wirklichkeit Eckhard Kohlhuber und kommt aus Bayern.\n"
+                            "\n", cb);
                 // Delete progress message
                 bot.message_delete(msg.id, msg.channel_id);
             });
@@ -301,6 +299,10 @@ class Bot {
     }
     void prompt_add_msg(const dpp::message& msg) {
         try {
+            // Make sure message isn't too long
+            if (msg.content.size() > 512) {
+                return;
+            }
             // Format and append line
             for (const auto line : str_split(msg.content, '\n')) {
                 Timer timeout;
