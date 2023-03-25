@@ -171,7 +171,7 @@ public:
         bool abort = false;
         while (!abort && !fres.ends_with(end)) {
             // Sample top p and top k
-            const auto id = llama_sample_top_p_top_k(ctx, nullptr, 0, params.top_k, params.top_p, params.temp, 1.0f);
+            const auto id = llama_sample_top_p_top_k(ctx, state.embd.data()+state.embd.size()-64, 64, params.top_k, params.top_p, params.temp, 1.7f);
 
             // Add token
             state.embd.push_back(id);
