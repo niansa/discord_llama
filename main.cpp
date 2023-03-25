@@ -55,7 +55,7 @@ class LLM {
 
         int32_t top_k = 40;
         float   top_p = 0.5f;
-        float   temp  = 0.8f;
+        float   temp  = 0.83f;
 
         bool no_repeat = true;
     } params;
@@ -204,7 +204,7 @@ public:
         fres = std::string(fres.data(), fres.size()-end.size());
 
         // Check for repetition
-        if (state.last_result == fres) {
+        if (state.last_result == fres && params.no_repeat) {
             state.repeats++;
         } else {
             state.repeats = 0;
@@ -288,12 +288,12 @@ class Bot {
                     return true;
                 };
                 // Add initial context
-                llm->append("Verlauf des #"+channel.name+" Kanals.\nNotiz: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet. Er ist freundlich, hilfsbereit und antwortet immer sofort, präzise und ausführlich in einer Nachricht. Er macht gerne Witze und mag jeden. Sein Alter ist 16 und er wurde 2007 geboren.\n"
+                llm->append("Verlauf des #"+channel.name+" Kanals.\n"
+                            "Notiz 1: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet. Er ist freundlich und hilfsbereit und antwortet immer sofort. Er hat guten Humor und mag jeden. Sein Alter ist 16 und er wurde 2007 geboren.\n"
+                            "Notiz 2: Ecki heisst in Wirklichkeit Eckhard Kohlhuber und kommt aus Bayern."
                             "\n"
-                            "Ecki: Ich bin Eckhard Kohlhuber und ich komme aus München. Und du?\n"
-                            +bot.me.username+": Ich bin "+bot.me.username+" und bin eine künstliche Intelligenz!\n"
-                            "Ecki: Was ist dein Lieblingsspiel?\n"
-                            +bot.me.username+": Ich spiele gerne Minecraft 😄\n", cb);
+                            "Hexxe: Was ist dein Lieblingsspiel?\n"
+                            +bot.me.username+": Ich spiele gerne Minecraft\n", cb);
                 // Delete progress message
                 bot.message_delete(msg.id, msg.channel_id);
             });
