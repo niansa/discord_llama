@@ -51,7 +51,7 @@ class LLM {
         int32_t seed; // RNG seed
         int32_t n_threads = static_cast<int32_t>(std::thread::hardware_concurrency()) / 4;
         int32_t n_ctx = 2024; // Context size
-        int32_t n_batch = 8; // Batch size
+        int32_t n_batch = 8; // Batch size, unused for now
 
         int32_t top_k = 40;
         float   top_p = 0.5f;
@@ -65,7 +65,7 @@ class LLM {
         std::vector<llama_token> embd;
         int n_ctx;
         std::string last_result;
-        bool has_repeated;
+        int repeats;
     } state;
 
     llama_context *ctx = nullptr;
@@ -101,7 +101,7 @@ class LLM {
 
         // Initialize some variables
         state.n_ctx = llama_n_ctx(ctx);
-        state.has_repeated = false;
+        state.repeats = 0;
     }
 
 public:
@@ -176,7 +176,8 @@ public:
         bool abort = false;
         while (!abort && !fres.ends_with(end)) {
             // Sample top p and top k
-            const auto id = llama_sample_top_p_top_k(ctx, state.has_repeated?(state.embd.data()+state.embd.size()-64):nullptr, state.has_repeated?64:0, params.top_k, params.top_p, params.temp, state.has_repeated?1.7f:1.0f);
+            bool has_repeated = state.repeats>4;
+            const auto id = llama_sample_top_p_top_k(ctx, has_repeated?(state.embd.data()+state.embd.size()-64):nullptr, has_repeated?64:0, params.top_k, params.top_p, params.temp, has_repeated?1.7f:1.0f);
 
             // Add token
             state.embd.push_back(id);
@@ -191,7 +192,7 @@ public:
             fres.append(str);
 
             // Evaluate token
-            // TODO: Larger batch size
+            // TODO: Respect batch size
             llama_eval(ctx, state.embd.data()+state.embd.size()-1, 1, state.embd.size()-1, params.n_threads);
 
             // Tick
@@ -203,8 +204,12 @@ public:
         fres = std::string(fres.data(), fres.size()-end.size());
 
         // Check for repetition
-        state.has_repeated = state.last_result == fres;
-        state.last_result = fres;
+        if (state.last_result == fres) {
+            state.repeats++;
+        } else {
+            state.repeats = 0;
+            state.last_result = fres;
+        }
 
         // Return final string
         return fres;
