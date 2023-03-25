@@ -203,13 +203,7 @@ public:
         fres = std::string(fres.data(), fres.size()-end.size());
 
         // Check for repetition
-        if (!state.has_repeated) {
-            if (state.last_result == fres) {
-                state.has_repeated = true;
-            }
-        } else {
-            state.has_repeated = false;
-        }
+        state.has_repeated = state.last_result == fres;
         state.last_result = fres;
 
         // Return final string
