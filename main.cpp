@@ -56,12 +56,16 @@ class LLM {
         int32_t top_k = 40;
         float   top_p = 0.5f;
         float   temp  = 0.8f;
+
+        bool no_repeat = true;
     } params;
 
     struct State {
         std::string prompt;
         std::vector<llama_token> embd;
         int n_ctx;
+        std::string last_result;
+        bool has_repeated;
     } state;
 
     llama_context *ctx = nullptr;
@@ -97,6 +101,7 @@ class LLM {
 
         // Initialize some variables
         state.n_ctx = llama_n_ctx(ctx);
+        state.has_repeated = false;
     }
 
 public:
@@ -171,7 +176,7 @@ public:
         bool abort = false;
         while (!abort && !fres.ends_with(end)) {
             // Sample top p and top k
-            const auto id = llama_sample_top_p_top_k(ctx, state.embd.data()+state.embd.size()-64, 64, params.top_k, params.top_p, params.temp, 1.7f);
+            const auto id = llama_sample_top_p_top_k(ctx, state.has_repeated?(state.embd.data()+state.embd.size()-64):nullptr, state.has_repeated?64:0, params.top_k, params.top_p, params.temp, state.has_repeated?1.7f:1.0f);
 
             // Add token
             state.embd.push_back(id);
@@ -193,9 +198,22 @@ public:
             if (on_tick && !on_tick()) abort = true;
         }
 
-        // Return final string
+        // Create final string
         state.prompt.append(fres);
-        return std::string(fres.data(), fres.size()-end.size());
+        fres = std::string(fres.data(), fres.size()-end.size());
+
+        // Check for repetition
+        if (!state.has_repeated) {
+            if (state.last_result == fres) {
+                state.has_repeated = true;
+            }
+        } else {
+            state.has_repeated = false;
+        }
+        state.last_result = fres;
+
+        // Return final string
+        return fres;
     }
 };
 
