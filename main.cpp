@@ -124,6 +124,7 @@ public:
         init();
     }
     ~LLM() {
+        std::scoped_lock L(lock);
         if (ctx) llama_free(ctx);
     }
 
