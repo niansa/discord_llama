@@ -75,7 +75,7 @@ class LLM {
     std::string clean_string(const std::string& str) {
         std::string fres;
         for (const auto c : str) {
-            if (c >= 0x20 && c <= 0x7E
+            if ((c >= 0x20 && c <= 0x7E)
              || c == '\n'
              || c == "ä"[0] || c == "ä"[1] || c == "ä"[2]
              || c == "ö"[0] || c == "ö"[1] || c == "ö"[2]
