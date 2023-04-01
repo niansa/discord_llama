@@ -146,8 +146,8 @@ class Bot {
                 };
                 // Add initial context
                 std::unique_lock L(llm_lock);
-                llm->append("Verlauf des #"+clean_string(channel.name)+" Kanals.\n"
-                            "Notiz 1: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet. Er ist freundlich, hilfsbereit und antwortet immer ausfuehrlich. Er hat guten Humor und mag jeden. Sein Alter ist 16 und er wurde 2007 geboren.\n"
+                llm->append("Verlauf des #"+channel.name+" Kanals.\n"
+                            "Notiz 1: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet. Er ist freundlich und hilfsbereit und antwortet immer sofort und ausfuehrlich in einer Nachricht. Er hat guten Humor und mag jeden. Sein Alter ist 16 und er wurde 2007 geboren.\n"
                             "Notiz 2: Ecki heisst in Wirklichkeit Eckhard Kohlhuber und kommt aus Bayern.\n"
                             "\n", cb);
                 // Delete progress message
