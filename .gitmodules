@@ -1,6 +1,6 @@
 [submodule "DPP"]
 	path = DPP
 	url = https://github.com/brainboxdotcc/DPP.git
-[submodule "llama.cpp"]
-	path = llama.cpp
-	url = https://github.com/ggerganov/llama.cpp.git
+[submodule "libjustlm"]
+	path = libjustlm
+	url = https://gitlab.com/niansa/libjustlm.git
