@@ -167,7 +167,7 @@ class Bot {
             std::unique_lock L(llm_lock);
             for (const auto line : str_split(msg.content, '\n')) {
                 Timer timeout;
-                llm->append(msg.author.username+": "+std::string(line)+'\n', [&] (float) {
+                llm->append(msg.author.username+": "+clean_string(line)+'\n', [&] (float) {
                     if (timeout.get<std::chrono::minutes>() > 1) {
                         std::cerr << "\nWarning: Timeout reached processing message" << std::endl;
                         return false;
