@@ -290,6 +290,8 @@ public:
             });
         });
         bot.on_message_create([=, this] (const dpp::message_create_t& event) {
+            // Ignore messages before full startup
+            if (!llm) return;
             // Make sure message source is correct
             if (event.msg.channel_id != channel_id) return;
             // Make sure message has content
