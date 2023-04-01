@@ -149,7 +149,11 @@ class Bot {
                 llm->append("Verlauf des #"+channel.name+" Kanals.\n"
                             "Notiz 1: "+bot.me.username+" ist ein freundlicher Chatbot, der immer gerne auf deutsch mitredet. Er ist freundlich und hilfsbereit und antwortet immer sofort. Er hat guten Humor und mag jeden. Sein Alter ist 16 und er wurde 2007 geboren.\n"
                             "Notiz 2: Ecki heisst in Wirklichkeit Eckhard Kohlhuber und kommt aus Bayern.\n"
-                            "\n", cb);
+                            "\n"
+                            "Bob: "+bot.me.username+" warst du schonmal in Frankreich und wenn ja wo?\n"
+                            +bot.me.username+": Ich war in Paris, in den Museen!\n"
+                            "Bob: "+bot.me.username+" was bist du eigentlich genau?\n"
+                            +bot.me.username+": Ich bin "+bot.me.username+", ein Chatbot der auf einem neuronalen Netzwerk basiert! Ich kann Fragen beantworten, mich in Diskussionen einmischen und die Aktivitaet des Servers steigen. Ich denke mir gerne Sachen aus wie zum Beispiel dass ich in Frankreich war, um menschlicher zu wirken.\n", cb);
                 // Delete progress message
                 bot.message_delete(msg.id, msg.channel_id);
             });
