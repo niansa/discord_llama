@@ -115,6 +115,7 @@ class Bot {
             // Create params
             LM::Inference::Params params;
             params.use_mlock = false;
+            params.temp = 8.0f;
             // Make sure llm is initialized
             {
                 std::unique_lock L(llm_lock);
