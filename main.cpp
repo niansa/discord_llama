@@ -193,11 +193,13 @@ class Bot {
     }
 
     // Must run in llama thread
-    void reply() {
+    void reply(const std::function<void ()>& after_placeholder_creation = nullptr) {
         ENSURE_LLM_THREAD();
         try {
             // Create placeholder message
             auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
+            // Call after_placeholder_creation callback
+            if (after_placeholder_creation) after_placeholder_creation();
             // Trigger LLM  correctly
             prompt_add_trigger();
             // Run model
@@ -223,7 +225,7 @@ class Bot {
     }
 
     // Must run in llama thread
-    void attempt_reply(const dpp::message& msg) {
+    void attempt_reply(const dpp::message& msg, const std::function<void ()>& after_placeholder_creation = nullptr) {
         ENSURE_LLM_THREAD();
         // Decide randomly
         /*if (rng.getBool(0.075f)) {
@@ -231,18 +233,18 @@ class Bot {
         }*/
         // Reply if message contains username, mention or ID
         if (msg.content.find(bot.me.username) != std::string::npos) {
-            return reply();
+            return reply(after_placeholder_creation);
         }
         // Reply if message references user
         for (const auto msg_id : my_messages) {
             if (msg.message_reference.message_id == msg_id) {
-                return reply();
+                return reply(after_placeholder_creation);
             }
         }
     }
 
     void enqueue_reply() {
-        tPool.submit(std::bind(&Bot::reply, this));
+        tPool.submit(std::bind(&Bot::reply, this, nullptr));
     }
 
     void idle_auto_reply() {
@@ -308,10 +310,11 @@ public:
                         reply();
                     } else {
                         tPool.submit([=, this] () {
-                            // Append message to history
-                            prompt_add_msg(msg);
                             // Attempt to send a reply
-                            attempt_reply(msg);
+                            attempt_reply(msg, [=, this] () {
+                                // Append message to history
+                                prompt_add_msg(msg);
+                            });
                         });
                     }
                 } catch (const std::exception& e) {
