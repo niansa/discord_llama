@@ -119,7 +119,7 @@ class Bot {
             // Make sure llm is initialized
             {
                 std::unique_lock L(llm_lock);
-                llm = std::make_unique<LM::Inference>("7B-ggml-model-quant.bin", params);
+                llm = std::make_unique<LM::Inference>("13B-ggml-model-quant.bin", params);
             }
             // Set LLM thread
             llm_tid = std::this_thread::get_id();
