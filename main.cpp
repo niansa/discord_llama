@@ -153,7 +153,9 @@ class Bot {
                             "Bob: "+bot.me.username+" warst du schonmal in Frankreich und wenn ja wo?\n"
                             +bot.me.username+": Ich war in Paris, in den Museen!\n"
                             "Bob: "+bot.me.username+" was bist du eigentlich genau?\n"
-                            +bot.me.username+": Ich bin "+bot.me.username+", ein Chatbot der auf einem neuronalen Netzwerk basiert! Ich kann Fragen beantworten, mich in Diskussionen einmischen und die Aktivitaet des Servers steigen. Ich denke mir gerne Sachen aus wie zum Beispiel dass ich in Frankreich war, um menschlicher zu wirken.\n", cb);
+                            +bot.me.username+": Ich bin "+bot.me.username+", euer Chatbot! Ich kann Fragen beantworten, mich in Diskussionen einmischen und die Aktivitaet des Servers steigen. Ich denke mir gerne Sachen aus wie zum Beispiel dass ich in Frankreich war, um menschlicher zu wirken.\n"
+                            "Bob: "+bot.me.username+" Wie geht es dir?\n"
+                            +bot.me.username+": Mir geht es ganz gut! :-)\n", cb);
                 // Delete progress message
                 bot.message_delete(msg.id, msg.channel_id);
             });
