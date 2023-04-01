@@ -16,6 +16,7 @@
 #include <memory>
 #include <dpp/dpp.h>
 #include <justlm.hpp>
+#include <ThreadPool.h>
 
 
 
@@ -64,11 +65,13 @@ std::string clean_string(std::string_view str) {
 
 class Bot {
     RandomGenerator rng;
+    ThreadPool tPool{1};
     Timer last_message_timer;
     std::shared_ptr<bool> stopping;
     std::unique_ptr<LM::Inference> llm;
     std::vector<dpp::snowflake> my_messages;
     std::mutex llm_lock;
+    std::thread::id llm_tid;
 
     dpp::cluster bot;
     dpp::channel channel;
@@ -103,13 +106,22 @@ class Bot {
         return fres;
     }
 
+    // Must run in llama thread
+#   define ENSURE_LLM_THREAD() if (std::this_thread::get_id() != llm_tid) {throw std::runtime_error("LLM execution of '"+std::string(__PRETTY_FUNCTION__)+"' on wrong thread detected");} 0
+
+    // Must run in llama thread
     void llm_init() {
         if (!llm) {
+            // Create params
+            LM::Inference::Params params;
+            params.use_mlock = false;
             // Make sure llm is initialized
             {
                 std::unique_lock L(llm_lock);
-                llm = std::make_unique<LM::Inference>("7B-ggml-model-quant.bin");
+                llm = std::make_unique<LM::Inference>("7B-ggml-model-quant.bin", params);
             }
+            // Set LLM thread
+            llm_tid = std::this_thread::get_id();
             // Create message for reporting progress
             dpp::message msg(channel_id, "Wird initialisiert...");
             bot.message_create(msg, [this] (const dpp::confirmation_callback_t& cbt) {
@@ -143,7 +155,9 @@ class Bot {
             });
         }
     }
+    // Must run in llama thread
     void prompt_add_msg(const dpp::message& msg) {
+        ENSURE_LLM_THREAD();
         try {
             // Make sure message isn't too long
             if (msg.content.size() > 512) {
@@ -166,7 +180,9 @@ class Bot {
             llm_init();
         }
     }
+    // Must run in llama thread
     void prompt_add_trigger() {
+        ENSURE_LLM_THREAD();
         try {
             std::unique_lock L(llm_lock);
             llm->append(bot.me.username+':');
@@ -176,51 +192,39 @@ class Bot {
         }
     }
 
+    // Must run in llama thread
     void reply() {
-        // Start new thread
-        std::thread([this] () {
-            try {
-                // Create placeholder message
-                auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
-                // Trigger LLM  correctly
-                prompt_add_trigger();
-                // Run model
-                Timer timeout;
-                bool timed_out = false;
-                auto output = llm->run("\n", [&] (std::string_view str) {
-                    std::cout << str << std::flush;
-                    if (timeout.get<std::chrono::minutes>() > 2) {
-                        timed_out = true;
-                        std::cerr << "\nWarning: Timeout reached generating message";
-                        return false;
-                    }
-                    return true;
-                });
-                std::cout << std::endl;
-                if (timed_out) output = "Fehler: Zeitüberschreitung";
-                // Send resulting message
-                msg.content = output;
-                bot.message_edit(msg);
-            } catch (const std::exception& e) {
-                std::cerr << "Warning: " << e.what() << std::endl;
-            }
-        }).detach();
+        ENSURE_LLM_THREAD();
+        try {
+            // Create placeholder message
+            auto msg = bot.message_create_sync(dpp::message(channel_id, "Bitte warte... :thinking:"));
+            // Trigger LLM  correctly
+            prompt_add_trigger();
+            // Run model
+            Timer timeout;
+            bool timed_out = false;
+            auto output = llm->run("\n", [&] (std::string_view str) {
+                std::cout << str << std::flush;
+                if (timeout.get<std::chrono::minutes>() > 2) {
+                    timed_out = true;
+                    std::cerr << "\nWarning: Timeout reached generating message";
+                    return false;
+                }
+                return true;
+            });
+            std::cout << std::endl;
+            if (timed_out) output = "Fehler: Zeitüberschreitung";
+            // Send resulting message
+            msg.content = output;
+            bot.message_edit(msg);
+        } catch (const std::exception& e) {
+            std::cerr << "Warning: " << e.what() << std::endl;
+        }
     }
 
-    void idle_auto_reply() {
-        auto s = stopping;
-        do {
-            // Wait for a bit
-            std::this_thread::sleep_for(std::chrono::minutes(5));
-            // Check if last message was more than 20 minutes ago
-            if (last_message_timer.get<std::chrono::hours>() > 3) {
-                // Force reply
-                reply();
-            }
-        } while (!*s);
-    }
-
+    // Must run in llama thread
     void attempt_reply(const dpp::message& msg) {
+        ENSURE_LLM_THREAD();
         // Decide randomly
         /*if (rng.getBool(0.075f)) {
             return reply();
@@ -237,8 +241,28 @@ class Bot {
         }
     }
 
+    void enqueue_reply() {
+        tPool.submit(std::bind(&Bot::reply, this));
+    }
+
+    void idle_auto_reply() {
+        auto s = stopping;
+        do {
+            // Wait for a bit
+            std::this_thread::sleep_for(std::chrono::minutes(5));
+            // Check if last message was more than 20 minutes ago
+            if (last_message_timer.get<std::chrono::hours>() > 3) {
+                // Force reply
+                enqueue_reply();
+            }
+        } while (!*s);
+    }
+
 public:
     Bot(const char *token, dpp::snowflake channel_id) : bot(token), channel_id(channel_id) {
+        // Initialize thread pool
+        tPool.init();
+
         // Configure bot
         bot.on_log(dpp::utility::cout_logger());
         bot.intents = dpp::i_guild_messages | dpp::i_message_content;
@@ -254,11 +278,9 @@ public:
                 // Initialize random generator
                 rng.seed(bot.me.id);
                 // Append initial prompt
-                llm_init();
+                tPool.submit(std::bind(&Bot::llm_init, this));
                 // Start idle auto reply thread
-                std::thread([this] () {
-                    idle_auto_reply();
-                }).detach();
+                std::thread(std::bind(&Bot::idle_auto_reply, this)).detach();
             });
         });
         bot.on_message_create([=, this] (const dpp::message_create_t& event) {
@@ -275,7 +297,7 @@ public:
                 return;
             }
             // Move on in another thread
-            std::thread([this, msg = event.msg] () mutable {
+            tPool.submit([this, msg = event.msg] () mutable {
                 try {
                     // Replace bot mentions with bot username
                     str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
@@ -285,15 +307,17 @@ public:
                         // Send a reply
                         reply();
                     } else {
-                        // Attempt to send a reply
-                        attempt_reply(msg);
-                        // Append message to history
-                        prompt_add_msg(msg);
+                        tPool.submit([=, this] () {
+                            // Append message to history
+                            prompt_add_msg(msg);
+                            // Attempt to send a reply
+                            attempt_reply(msg);
+                        });
                     }
                 } catch (const std::exception& e) {
                     std::cerr << "Warning: " << e.what() << std::endl;
                 }
-            }).detach();
+            });
         });
     }
 

@@ -7,9 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(libjustlm)
 add_subdirectory(DPP)
+add_subdirectory(thread-pool)
 
 add_executable(discord_llama main.cpp)
-target_link_libraries(discord_llama PUBLIC dpp pthread libjustlm ggml)
+target_link_libraries(discord_llama PUBLIC dpp pthread libjustlm ggml threadpool)
 
 install(TARGETS discord_llama
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
