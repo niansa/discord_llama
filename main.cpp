@@ -115,7 +115,7 @@ class Bot {
             // Create params
             LM::Inference::Params params;
             params.use_mlock = false;
-            params.temp = 0.72f;
+            params.temp = 0.2f;
             params.n_repeat_last = 128;
             params.repeat_penalty = 1.273333334f;
             // Make sure llm is initialized
