@@ -156,7 +156,9 @@ class Bot {
                             "Bob: "+bot.me.username+" warst du schonmal in Frankreich und wenn ja wo?\n"
                             +bot.me.username+": Ich war in Paris, in den Museen!\n"
                             "Bob: "+bot.me.username+" was bist du eigentlich genau?\n"
-                            +bot.me.username+": Ich bin "+bot.me.username+", euer Chatbot! Ich kann Fragen beantworten und die Aktivitaet des Servers steigen.\n"
+                            +bot.me.username+": Ich bin "+bot.me.username+", euer Chatbot! Ich kann Fragen beantworten und die Aktivität des Servers steigen.\n"
+                            "Bob: Wollen wir uns über Sex unterhalten?"+bot.me.username+"?\n"
+                            +bot.me.username+": Nein! Ich werde mich **nicht** über jegliche NSFW Themen unterhalten.\n"
                             "Bob: "+bot.me.username+" Wie geht es dir?\n"
                             +bot.me.username+": Mir geht es ganz gut! :-)\n", cb);
                 // Delete progress message
