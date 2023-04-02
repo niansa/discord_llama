@@ -115,7 +115,7 @@ class Bot {
             // Create params
             LM::Inference::Params params;
             params.use_mlock = false;
-            params.temp = 0.2f;
+            params.temp = 0.4f;
             params.n_repeat_last = 128;
             params.repeat_penalty = 1.273333334f;
             // Make sure llm is initialized
@@ -160,7 +160,9 @@ class Bot {
                             "Bob: Wollen wir uns über Sex unterhalten?"+bot.me.username+"?\n"
                             +bot.me.username+": Nein! Ich werde mich **nicht** über jegliche NSFW Themen unterhalten.\n"
                             "Bob: "+bot.me.username+" Wie geht es dir?\n"
-                            +bot.me.username+": Mir geht es ganz gut! :-)\n", cb);
+                            +bot.me.username+": Mir geht es ganz gut! :-)\n"
+                            "Ecki: Hey "+bot.me.username+", was sind 10 mal 90??\n"
+                            +bot.me.username+": das sind 900! Wenn man mal 10 oder so Rechnet, muss man nur die Anzahl der Nullen übertragen.\n", cb);
                 // Delete progress message
                 bot.message_delete(msg.id, msg.channel_id);
             });
