@@ -1,6 +1,6 @@
 [submodule "DPP"]
 	path = DPP
 	url = https://github.com/brainboxdotcc/DPP.git
-[submodule "libjustlm"]
-	path = libjustlm
-	url = https://gitlab.com/niansa/libjustlm.git
+[submodule "anyproc"]
+	path = anyproc
+	url = https://gitlab.com/niansa/anyproc.git
