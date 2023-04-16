@@ -426,7 +426,7 @@ public:
 
 int main(int argc, char **argv) {
     // Check arguments
-    if (argc < 3) {
+    if (argc < 4) {
         std::cout << "Usage: " << argv[0] << " <language (like \"EN\")> <token> <channel>" << std::endl;
         return -1;
     }
