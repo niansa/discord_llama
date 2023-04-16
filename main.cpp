@@ -129,14 +129,24 @@ class Bot {
     // Must run in llama thread
     const std::string& llm_translate_to_en(const std::string& text) {
         ENSURE_LLM_THREAD();
+        // No need for translation if language is english already
         if (language == "EN") return text;
+        // I am optimizing heavily for the above case. This function always returns a reference so a trick is needed here
         static std::string fres;
+        fres = text;
+        // Replace bot username with {43}
+        str_replace_in_place(fres, bot.me.username, "{43}");
+        // Run translation
         try {
-            fres = translator->translate(text, "EN", show_console_progress);
+            fres = translator->translate(fres, "EN", show_console_progress);
         } catch (const LM::Inference::ContextLengthException&) {
+            // Handle potential context overflow error
             translator.reset();
             llm_init();
+            return llm_translate_to_en(text);
         }
+        // Replace {43} back with bot username
+        str_replace_in_place(fres, "{43}", bot.me.username);
         std::cout << text << " --> (EN) " << fres << std::endl;
         return fres;
     }
@@ -144,14 +154,24 @@ class Bot {
     // Must run in llama thread
     const std::string& llm_translate_from_en(const std::string& text) {
         ENSURE_LLM_THREAD();
+        // No need for translation if language is english already
         if (language == "EN") return text;
+        // I am optimizing heavily for the above case. This function always returns a reference so a trick is needed here
         static std::string fres;
+        fres = text;
+        // Replace bot username with {43}
+        str_replace_in_place(fres, bot.me.username, "{43}");
+        // Run translation
         try {
-            fres = translator->translate(text, language, show_console_progress);
+            fres = translator->translate(fres, language, show_console_progress);
         } catch (const LM::Inference::ContextLengthException&) {
+            // Handle potential context overflow error
             translator.reset();
             llm_init();
+            return llm_translate_from_en(text);
         }
+        // Replace {43} back with bot username
+        str_replace_in_place(fres, "{43}", bot.me.username);
         std::cout << text << " --> (" << language << ") " << fres << std::endl;
         return fres;
     }
@@ -176,9 +196,9 @@ class Bot {
             llm_tid = std::this_thread::get_id();
             // Translate texts
             if (!texts.translated) {
+                texts.please_wait = llm_translate_from_en(texts.please_wait);
                 texts.initializing = llm_translate_from_en(texts.initializing);
                 texts.loading = llm_translate_from_en(texts.loading);
-                texts.please_wait = llm_translate_from_en(texts.please_wait);
                 texts.timeout = llm_translate_from_en(texts.timeout);
                 texts.translated = true;
             }
