@@ -315,7 +315,7 @@ class Bot {
     }
 
     // Must run in llama thread
-    void attempt_reply(const dpp::message& msg, const std::function<void ()>& after_placeholder_creation = nullptr) {
+    bool attempt_reply(const dpp::message& msg, const std::function<void ()>& after_placeholder_creation = nullptr) {
         ENSURE_LLM_THREAD();
         // Decide randomly
         /*if (rng.getBool(0.075f)) {
@@ -323,14 +323,18 @@ class Bot {
         }*/
         // Reply if message contains username, mention or ID
         if (msg.content.find(bot.me.username) != std::string::npos) {
-            return reply(after_placeholder_creation);
+            reply(after_placeholder_creation);
+            return true;
         }
         // Reply if message references user
         for (const auto msg_id : my_messages) {
             if (msg.message_reference.message_id == msg_id) {
-                return reply(after_placeholder_creation);
+                reply(after_placeholder_creation);
+                return true;
             }
         }
+        // Don't reply otherwise
+        return false;
     }
 
     void enqueue_reply() {
@@ -403,10 +407,15 @@ public:
                     } else {
                         tPool.submit([=, this] () {
                             // Attempt to send a reply
-                            attempt_reply(msg, [=, this] () {
+                            bool replied = attempt_reply(msg, [=, this] () {
                                 // Append message to history
                                 prompt_add_msg(msg);
                             });
+                            // If none was send, still append message to history.
+                            if (!replied) {
+                                // Append message to history
+                                prompt_add_msg(msg);
+                            }
                         });
                     }
                 } catch (const std::exception& e) {
