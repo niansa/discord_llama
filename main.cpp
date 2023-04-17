@@ -134,8 +134,8 @@ class Bot {
         // I am optimizing heavily for the above case. This function always returns a reference so a trick is needed here
         static std::string fres;
         fres = text;
-        // Replace bot username with {43}
-        str_replace_in_place(fres, bot.me.username, "{43}");
+        // Replace bot username with [43]
+        str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
         try {
             fres = translator->translate(fres, "EN", show_console_progress);
@@ -145,8 +145,8 @@ class Bot {
             llm_init();
             return llm_translate_to_en(text);
         }
-        // Replace {43} back with bot username
-        str_replace_in_place(fres, "{43}", bot.me.username);
+        // Replace [43] back with bot username
+        str_replace_in_place(fres, "[43]", bot.me.username);
         std::cout << text << " --> (EN) " << fres << std::endl;
         return fres;
     }
@@ -159,8 +159,8 @@ class Bot {
         // I am optimizing heavily for the above case. This function always returns a reference so a trick is needed here
         static std::string fres;
         fres = text;
-        // Replace bot username with {43}
-        str_replace_in_place(fres, bot.me.username, "{43}");
+        // Replace bot username with [43]
+        str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
         try {
             fres = translator->translate(fres, language, show_console_progress);
@@ -170,8 +170,8 @@ class Bot {
             llm_init();
             return llm_translate_from_en(text);
         }
-        // Replace {43} back with bot username
-        str_replace_in_place(fres, "{43}", bot.me.username);
+        // Replace [43] back with bot username
+        str_replace_in_place(fres, "[43]", bot.me.username);
         std::cout << text << " --> (" << language << ") " << fres << std::endl;
         return fres;
     }
