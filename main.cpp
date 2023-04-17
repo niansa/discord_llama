@@ -69,7 +69,7 @@ class Bot {
     ThreadPool tPool{1};
     Timer last_message_timer;
     std::shared_ptr<bool> stopping;
-    std::unique_ptr<LM::Inference> llm;
+    std::unique_ptr<LM::Inference> llm = nullptr;
     std::unique_ptr<Translator> translator;
     std::vector<dpp::snowflake> my_messages;
     std::mutex llm_lock;
