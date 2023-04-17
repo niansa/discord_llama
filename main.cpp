@@ -189,8 +189,8 @@ class Bot {
             // Make sure llm is initialized
             {
                 std::unique_lock L(llm_lock);
+                if (translator == nullptr && language != "EN") translator = std::make_unique<Translator>("7B-ggml-model-quant.bin");
                 llm = std::make_unique<LM::Inference>("13B-ggml-model-quant.bin", params);
-                if (language != "EN") translator = std::make_unique<Translator>("7B-ggml-model-quant.bin");
             }
             // Set LLM thread
             llm_tid = std::this_thread::get_id();
