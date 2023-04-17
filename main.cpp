@@ -227,7 +227,7 @@ class Bot {
                 // Add initial context
                 std::unique_lock L(llm_lock);
                 llm->append("History of the #"+channel.name+" channel.\n"
-                            "Note 1: "+bot.me.username+" is a friendly chatbot that is always happy to talk in German. He is friendly and helpful and always answers immediately. He has a good sense of humor and likes everyone. His age is 16 and he was born in 2007.\n"
+                            "Note 1: "+bot.me.username+" is a friendly chatbot that is always happy to talk. He is friendly and helpful and always answers immediately. He has a good sense of humor and likes everyone. His age is 16 and he was born in 2007.\n"
                             "Note 2: Ecki's real name is Eckhard Kohlhuber and he comes from Bavaria.\n"
                             "\n"
                             "Bob: "+bot.me.username+" have you ever been to France and if yes where?\n"
