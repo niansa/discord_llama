@@ -185,7 +185,6 @@ class Bot {
             params.temp = 0.5f;
             params.n_repeat_last = 128;
             params.repeat_penalty = 1.273333334f;
-            params.n_ctx = 1024;
             // Make sure llm is initialized
             {
                 std::unique_lock L(llm_lock);
