@@ -11,7 +11,7 @@
 #include <functional>
 #include <array>
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <mutex>
 #include <memory>
 #include <dpp/dpp.h>
@@ -72,6 +72,7 @@ class Bot {
     std::unique_ptr<LM::Inference> llm = nullptr;
     std::unique_ptr<Translator> translator;
     std::vector<dpp::snowflake> my_messages;
+    std::unordered_map<dpp::snowflake, dpp::user> users;
     std::mutex llm_lock;
     std::thread::id llm_tid;
 
@@ -379,6 +380,8 @@ public:
             });
         });
         bot.on_message_create([=, this] (const dpp::message_create_t& event) {
+            // Update user cache
+            users[event.msg.author.id] = event.msg.author;
             // Ignore messages before full startup
             if (!llm) return;
             // Make sure message source is correct
@@ -398,6 +401,11 @@ public:
                 try {
                     // Replace bot mentions with bot username
                     str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
+                    // Replace all other known users
+                    for (const auto& [user_id, user] : users) {
+                        str_replace_in_place(msg.content, "<@"+std::to_string(user_id)+'>', user.username);
+                    }
+                    // Handle message somehow...
                     if (msg.content == "!trigger") {
                         // Delete message
                         bot.message_delete(msg.id, msg.channel_id);
