@@ -178,11 +178,11 @@ class Bot {
 
     constexpr static LM::Inference::Params llm_get_default_params() {
         return {
+            .n_ctx = 1012,
             .n_repeat_last = 256,
             .temp = 0.4f,
             .repeat_penalty = 1.372222224f,
-            .use_mlock = false,
-            .n_ctx = 1012
+            .use_mlock = false
         };
     }
 
