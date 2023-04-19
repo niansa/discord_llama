@@ -257,13 +257,16 @@ class Bot {
             std::unique_lock L(llm_lock);
             for (const auto line : str_split(msg.content, '\n')) {
                 Timer timeout;
+                bool timeout_exceeded = false;
                 llm->append(msg.author.username+": "+llm_translate_to_en(clean_string(line))+'\n', [&] (float progress) {
                     if (timeout.get<std::chrono::minutes>() > 1) {
-                        std::cerr << "\nWarning: Timeout reached processing message" << std::endl;
+                        std::cerr << "\nWarning: Timeout exceeded processing message" << std::endl;
+                        timeout_exceeded = true;
                         return false;
                     }
                     return show_console_progress(progress);
                 });
+                if (timeout_exceeded) llm->append("\n");
             }
         } catch (const LM::Inference::ContextLengthException&) {
             llm.reset();
@@ -294,18 +297,21 @@ class Bot {
             prompt_add_trigger();
             // Run model
             Timer timeout;
-            bool timed_out = false;
+            bool timeout_exceeded = false;
             auto output = llm->run("\n", [&] (std::string_view str) {
                 std::cout << str << std::flush;
                 if (timeout.get<std::chrono::minutes>() > 2) {
-                    timed_out = true;
-                    std::cerr << "\nWarning: Timeout reached generating message";
+                    timeout_exceeded = true;
+                    std::cerr << "\nWarning: Timeout exceeded generating message";
                     return false;
                 }
                 return true;
             });
             std::cout << std::endl;
-            if (timed_out) output = texts.timeout;
+            if (timeout_exceeded) {
+                llm->append("\n");
+                output = texts.timeout;
+            }
             // Send resulting message
             msg.content = llm_translate_from_en(output);
             bot.message_edit(msg);
