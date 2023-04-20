@@ -180,7 +180,7 @@ class Bot {
         return {
             .n_ctx = 1012,
             .n_repeat_last = 256,
-            .temp = 0.1f,
+            .temp = 0.3f,
             .repeat_penalty = 1.372222224f,
             .use_mlock = false
         };
