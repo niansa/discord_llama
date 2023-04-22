@@ -1,2 +1,2 @@
 # Discord LLaMa
-A funny, slow but multi-lingual Discord bot using LLaMa!
+A funny and multi-lingual Discord bot using LLaMa!
