@@ -1,7 +1,9 @@
 token MTA0MDYxMTQzNjUwNzk1OTMyNw.Gl_iMU.jVVM3bRqBJVi8ORVpWHquOivlASGJpRySt8qFg
-channel 1099461766888574989
+
 # The following parameters are set to their defaults here and can be ommited
 language EN
 inference_model 13B-ggml-model-quant.bin
 translation_model 13B-ggml-model-quant.bin
 mlock false
+pool_size 2
+threads 4
