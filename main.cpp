@@ -111,7 +111,10 @@ class Bot {
     std::string_view llm_translate_to_en(std::string_view text) {
         ENSURE_LLM_THREAD();
         // No need for translation if language is english already
-        if (language == "EN") return text;
+        if (language == "EN") {
+            std::cout << "(" << language << ") " << text << std::endl;
+            return text;
+        }
         // I am optimizing heavily for the above case. This function always returns a reference so a trick is needed here
         static std::string fres;
         fres = text;
@@ -135,7 +138,10 @@ class Bot {
     std::string_view llm_translate_from_en(std::string_view text) {
         ENSURE_LLM_THREAD();
         // No need for translation if language is english already
-        if (language == "EN") return text;
+        if (language == "EN") {
+            std::cout << "(" << language << ") " << text << std::endl;
+            return text;
+        }
         // I am optimizing heavily for the above case. This function always returns a reference so a trick is needed here
         static std::string fres;
         fres = text;
@@ -155,13 +161,13 @@ class Bot {
         return fres;
     }
 
-    constexpr static LM::Inference::Params llm_get_default_params() {
+    constexpr static LM::Inference::Params llm_get_params(bool mlock) {
         return {
             .n_ctx = 1012,
             .n_repeat_last = 256,
             .temp = 0.3f,
             .repeat_penalty = 1.372222224f,
-            .use_mlock = false
+            .use_mlock = mlock
         };
     }
 
@@ -337,8 +343,17 @@ class Bot {
     }
 
 public:
-    Bot(std::string_view language, const char *token, dpp::snowflake channel_id) : bot(token), channel_id(channel_id), language(language),
-                                                                                   llm("13B-ggml-model-quant.bin", llm_get_default_params()), translator("13B-ggml-model-quant.bin") {
+    struct Configuration {
+        std::string token,
+                    channel,
+                    language = "EN",
+                    inference_model = "13B-ggml-model-quant.bin",
+                    translation_model = "13B-ggml-model-quant.bin";
+        bool mlock = false;
+    } config;
+
+    Bot(const Configuration& cfg) : config(cfg), bot(cfg.token), channel_id(cfg.channel), language(cfg.language),
+                                    llm(cfg.inference_model, llm_get_params(cfg.mlock)), translator(cfg.translation_model) {
         // Initialize thread pool
         tPool.init();
 
@@ -421,13 +436,45 @@ public:
 
 int main(int argc, char **argv) {
     // Check arguments
-    if (argc < 4) {
-        std::cout << "Usage: " << argv[0] << " <language (like \"EN\")> <token> <channel>" << std::endl;
+    if (argc < 2) {
+        std::cout << "Usage: " << argv[0] << " <config file location>" << std::endl;
         return -1;
     }
 
+    // Parse configuration
+    Bot::Configuration cfg;
+    std::ifstream cfgf(argv[1]);
+    if (!cfgf) {
+        std::cerr << "Failed to open configuration file: " << argv[1] << std::endl;
+        return -1;
+    }
+    for (std::string key; cfgf >> key;) {
+        // Read value
+        std::string value;
+        std::getline(cfgf, value);
+        // Erase whitespace
+        value.erase(0, 1);
+        // Check key and ignore comment lines
+        if (key == "token") {
+            cfg.token = std::move(value);
+        } else if (key == "channel") {
+            cfg.channel = std::move(value);
+        } else if (key == "language") {
+            cfg.language = std::move(value);
+        } else if (key == "inference_model") {
+            cfg.inference_model = std::move(value);
+        } else if (key == "translation_model") {
+            cfg.translation_model = std::move(value);
+        } else if (key == "mlock") {
+            cfg.mlock = (value=="true")?true:false;
+        } else if (!key.empty() && key[0] != '#') {
+            std::cerr << "Failed to parse configuration file: Unknown key: " << key << std::endl;
+            return -2;
+        }
+    }
+
     // Construct and configure bot
-    Bot bot(argv[1], argv[2], std::stoull(argv[3]));
+    Bot bot(cfg);
 
     // Start bot
     bot.start();
