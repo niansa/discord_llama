@@ -8,3 +8,4 @@ mlock false
 pool_size 2
 threads 4
 persistance true
+ctx_size 1012

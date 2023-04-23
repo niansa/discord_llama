@@ -168,7 +168,7 @@ class Bot {
     LM::Inference::Params llm_get_params() const {
         return {
             .n_threads = int(config.threads),
-            .n_ctx = 1012,
+            .n_ctx = int(config.ctx_size),
             .n_repeat_last = 256,
             .temp = 0.3f,
             .repeat_penalty = 1.372222224f,
@@ -344,7 +344,8 @@ public:
                     language = "EN",
                     inference_model = "13B-ggml-model-quant.bin",
                     translation_model = "13B-ggml-model-quant.bin";
-        unsigned pool_size = 2,
+        unsigned ctx_size = 1012,
+                 pool_size = 2,
                  threads = 4,
                  persistance = true;
         bool mlock = false;
@@ -466,6 +467,8 @@ int main(int argc, char **argv) {
             cfg.pool_size = std::stoi(value);
         } else if (key == "threads") {
             cfg.threads = std::stoi(value);
+        } else if (key == "ctx_size") {
+            cfg.ctx_size = std::stoi(value);
         } else if (key == "mlock") {
             cfg.mlock = (value=="true")?true:false;
         } else if (key == "persistance") {
