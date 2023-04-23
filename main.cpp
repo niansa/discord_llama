@@ -176,7 +176,7 @@ class Bot {
     }
 
     // Must run in llama thread
-    void llm_restart(LM::Inference& llm) {
+    void llm_restart(LM::Inference& inference) {
         // Deserialize init cache
         std::ifstream f("init_cache", std::ios::binary);
         inference.deserialize(f);
