@@ -171,6 +171,7 @@ class Bot {
             .n_repeat_last = 256,
             .temp = 0.3f,
             .repeat_penalty = 1.372222224f,
+            .eos_ignores = unsigned(-1),
             .use_mlock = config.mlock
         };
     }
