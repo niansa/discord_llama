@@ -341,14 +341,15 @@ public:
                     inference_model = "13B-ggml-model-quant.bin",
                     translation_model = "13B-ggml-model-quant.bin";
         unsigned pool_size = 2,
-                 threads = 4;
+                 threads = 4,
+                 persistance = true;
         bool mlock = false;
     } config;
 
     Bot(const Configuration& cfg) : config(cfg), bot(cfg.token), language(cfg.language),
-                                    llm_pool(cfg.pool_size, "discord_llama", false), translator(cfg.translation_model, llm_get_translation_params()) {
+                                    llm_pool(cfg.pool_size, "discord_llama", !cfg.persistance), translator(cfg.translation_model, llm_get_translation_params()) {
         // Configure llm_pool
-        llm_pool.set_store_on_destruct(true);
+        llm_pool.set_store_on_destruct(cfg.persistance);
 
         // Initialize thread pool
         tPool.init();
@@ -456,6 +457,8 @@ int main(int argc, char **argv) {
             cfg.threads = std::stoi(value);
         } else if (key == "mlock") {
             cfg.mlock = (value=="true")?true:false;
+        } else if (key == "persistance") {
+            cfg.persistance = (value=="true")?true:false;
         } else if (!key.empty() && key[0] != '#') {
             std::cerr << "Failed to parse configuration file: Unknown key: " << key << std::endl;
             return -2;

@@ -7,3 +7,4 @@ translation_model 13B-ggml-model-quant.bin
 mlock false
 pool_size 2
 threads 4
+persistance true
