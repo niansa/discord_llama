@@ -11,6 +11,7 @@
 #include <array>
 #include <vector>
 #include <unordered_map>
+#include <filesystem>
 #include <sstream>
 #include <mutex>
 #include <memory>
@@ -213,27 +214,29 @@ class Bot {
             texts.timeout = llm_translate_from_en(texts.timeout);
             texts.translated = true;
         }
-        // Inference for init cache TODO: Don't recreate on each startup
-        LM::Inference llm(config.inference_model, llm_get_params());
-        std::ofstream f("init_cache", std::ios::binary);
-        // Add initial context
-        llm.append("History of the discord server.\n"
-                   "Note 1: "+bot.me.username+" is a friendly chatbot that is always happy to talk. He is friendly and helpful and always answers immediately. He has a good sense of humor and likes everyone. His age is unknown.\n"
-                   "Note 2: Ecki's real name is Eckhard Kohlhuber and he comes from Bavaria.\n" // Little easter egg
-                   "\n"
-                   "This is the #meta channel.\n"
-                   "Bob: "+bot.me.username+" have you ever been to France and if yes where?\n"
-                   +bot.me.username+": I was in Paris, in the museums!\n"
-                   "Bob: "+bot.me.username+" what are you exactly?\n"
-                   +bot.me.username+": I am "+bot.me.username+", your chatbot! I can answer questions and increase the activity of the server.\n"
-                   "Bob: Shall we talk about sex? "+bot.me.username+"?\n"
-                   +bot.me.username+": No! I will **not** talk about any NSFW topics.\n"
-                   "Bob: "+bot.me.username+" How are you?\n"
-                   +bot.me.username+": I am quite well! :-)\n"
-                   "Ecki: Hey "+bot.me.username+", what is 10 times 90??\n"
-                   +bot.me.username+": that is 900!\n", show_console_progress);
-        // Serialize end result
-        llm.serialize(f);
+        // Inference for init cache
+        if (!std::filesystem::exists("init_cache")) {
+            LM::Inference llm(config.inference_model, llm_get_params());
+            std::ofstream f("init_cache", std::ios::binary);
+            // Add initial context
+            llm.append("History of the discord server.\n"
+                       "Note 1: "+bot.me.username+" is a friendly chatbot that is always happy to talk. He is friendly and helpful and always answers immediately. He has a good sense of humor and likes everyone. His age is unknown.\n"
+                       "Note 2: Ecki's real name is Eckhard Kohlhuber and he comes from Bavaria.\n" // Little easter egg
+                       "\n"
+                       "This is the #meta channel.\n"
+                       "Bob: "+bot.me.username+" have you ever been to France and if yes where?\n"
+                       +bot.me.username+": I was in Paris, in the museums!\n"
+                       "Bob: "+bot.me.username+" what are you exactly?\n"
+                       +bot.me.username+": I am "+bot.me.username+", your chatbot! I can answer questions and increase the activity of the server.\n"
+                       "Bob: Shall we talk about sex? "+bot.me.username+"?\n"
+                       +bot.me.username+": No! I will **not** talk about any NSFW topics.\n"
+                       "Bob: "+bot.me.username+" How are you?\n"
+                       +bot.me.username+": I am quite well! :-)\n"
+                       "Ecki: Hey "+bot.me.username+", what is 10 times 90??\n"
+                       +bot.me.username+": that is 900!\n", show_console_progress);
+            // Serialize end result
+            llm.serialize(f);
+        }
     }
     // Must run in llama thread
     void prompt_add_msg(const dpp::message& msg) {
