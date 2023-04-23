@@ -171,31 +171,15 @@ class Bot {
             .n_repeat_last = 256,
             .temp = 0.3f,
             .repeat_penalty = 1.372222224f,
-            .eos_ignores = unsigned(-1),
             .use_mlock = config.mlock
         };
     }
 
     // Must run in llama thread
     void llm_restart(LM::Inference& llm) {
-        llm.append("History of the discord server.\n"
-                   "Note 1: "+bot.me.username+" is a friendly chatbot that is always happy to talk. He is friendly and helpful and always answers immediately. He has a good sense of humor and likes everyone. His age is unknown.\n"
-                   "Note 2: Ecki's real name is Eckhard Kohlhuber and he comes from Bavaria.\n" // Little easter egg
-                   "\n"
-                   "This is the #meta channel.\n"
-                   "Bob: "+bot.me.username+" have you ever been to France and if yes where?\n"
-                   +bot.me.username+": I was in Paris, in the museums!\n"
-                   "Bob: "+bot.me.username+" what are you exactly?\n"
-                   +bot.me.username+": I am "+bot.me.username+", your chatbot! I can answer questions and increase the activity of the server.\n"
-                   "Bob: Shall we talk about sex? "+bot.me.username+"?\n"
-                   +bot.me.username+": No! I will **not** talk about any NSFW topics.\n"
-                   "Bob: "+bot.me.username+" How are you?\n"
-                   +bot.me.username+": I am quite well! :-)\n"
-                   "Ecki: Hey "+bot.me.username+", what is 10 times 90??\n"
-                   +bot.me.username+": that is 900!\n", show_console_progress);
         // Deserialize init cache
-        //std::ifstream f("init_cache", std::ios::binary);
-        //inference.deserialize(f);
+        std::ifstream f("init_cache", std::ios::binary);
+        inference.deserialize(f);
     }
     // Must run in llama thread
     LM::Inference &llm_restart(dpp::snowflake id) {
@@ -230,7 +214,6 @@ class Bot {
             texts.translated = true;
         }
         // Inference for init cache TODO: Don't recreate on each startup
-        return;
         LM::Inference llm(config.inference_model, llm_get_params());
         std::ofstream f("init_cache", std::ios::binary);
         // Add initial context
