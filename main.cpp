@@ -452,8 +452,8 @@ int main(int argc, char **argv) {
         // Read value
         std::string value;
         std::getline(cfgf, value);
-        // Erase whitespace
-        value.erase(0, 1);
+        // Erase all leading spaces
+        while (!value.empty() && (value[0] == ' ' || value[0] == '\t')) value.erase(0, 1);
         // Check key and ignore comment lines
         if (key == "token") {
             cfg.token = std::move(value);
