@@ -235,7 +235,7 @@ class Bot {
                            "Bob: "+bot.me.username+" How are you?\n"
                            +bot.me.username+": I am quite well! :-)\n"
                            "Ecki: Hey "+bot.me.username+", what is 10 times 90??\n"
-                           +bot.me.username+": that is 900!\n", show_console_progress);
+                           +bot.me.username+": That is 900!\n", show_console_progress);
             } else {
                 // Read file
                 std::string prompt;
