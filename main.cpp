@@ -326,8 +326,8 @@ class Bot {
                 return true;
             });
             std::cout << std::endl;
+            inference.append("\n");
             if (timeout_exceeded) {
-                inference.append("\n");
                 output = texts.timeout;
             }
             // Send resulting message
