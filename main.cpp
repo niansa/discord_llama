@@ -242,7 +242,8 @@ class Bot {
                 {
                     std::ifstream f(config.prompt_file);
                     if (!f) {
-                        throw std::runtime_error("Failed to open prompt file.");
+                        std::cerr << "Failed to open prompt file." << std::endl;
+                        abort();
                     }
                     std::ostringstream sstr;
                     sstr << f.rdbuf();
