@@ -242,7 +242,11 @@ class Bot {
                 {
                     std::ifstream f(config.prompt_file);
                     if (!f) {
+                        // Clean up and abort on error
                         std::cerr << "Failed to open prompt file." << std::endl;
+                        f.close();
+                        std::error_code ec;
+                        std::filesystem::remove("init_cache", ec);
                         abort();
                     }
                     std::ostringstream sstr;
