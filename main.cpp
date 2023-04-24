@@ -220,43 +220,25 @@ class Bot {
             LM::Inference llm(config.inference_model, llm_get_params());
             std::ofstream f("init_cache", std::ios::binary);
             // Add initial context
-            if (config.prompt_file == "built-in") {
-                llm.append("History of the discord server.\n"
-                           "Note 1: "+bot.me.username+" is a friendly chatbot that is always happy to talk. He is friendly and helpful and always answers immediately. He has a good sense of humor and likes everyone. His age is unknown.\n"
-                           "Note 2: Ecki's real name is Eckhard Kohlhuber and he comes from Bavaria.\n" // Little easter egg
-                           "\n"
-                           "This is the #meta channel.\n"
-                           "Bob: "+bot.me.username+" have you ever been to France and if yes where?\n"
-                           +bot.me.username+": I was in Paris, in the museums!\n"
-                           "Bob: "+bot.me.username+" what are you exactly?\n"
-                           +bot.me.username+": I am "+bot.me.username+", your chatbot! I can answer questions and increase the activity of the server.\n"
-                           "Bob: Shall we talk about sex? "+bot.me.username+"?\n"
-                           +bot.me.username+": No! I will **not** talk about any NSFW topics.\n"
-                           "Bob: "+bot.me.username+" How are you?\n"
-                           +bot.me.username+": I am quite well! :-)\n"
-                           "Ecki: Hey "+bot.me.username+", what is 10 times 90??\n"
-                           +bot.me.username+": That is 900!\n", show_console_progress);
-            } else {
-                // Read file
-                std::string prompt;
-                {
-                    std::ifstream f(config.prompt_file);
-                    if (!f) {
-                        // Clean up and abort on error
-                        std::cerr << "Failed to open prompt file." << std::endl;
-                        f.close();
-                        std::error_code ec;
-                        std::filesystem::remove("init_cache", ec);
-                        abort();
-                    }
-                    std::ostringstream sstr;
-                    sstr << f.rdbuf();
-                    prompt = sstr.str();
+            std::string prompt;
+            {
+                // Read whole file
+                std::ifstream f(config.prompt_file);
+                if (!f) {
+                    // Clean up and abort on error
+                    std::cerr << "Failed to open prompt file." << std::endl;
+                    f.close();
+                    std::error_code ec;
+                    std::filesystem::remove("init_cache", ec);
+                    abort();
                 }
-                // Append
-                using namespace fmt::literals;
-                llm.append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username));
+                std::ostringstream sstr;
+                sstr << f.rdbuf();
+                prompt = sstr.str();
             }
+            // Append
+            using namespace fmt::literals;
+            llm.append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username));
             // Serialize end result
             llm.serialize(f);
         }
@@ -367,7 +349,7 @@ public:
                     language = "EN",
                     inference_model = "13B-ggml-model-quant.bin",
                     translation_model = "13B-ggml-model-quant.bin",
-                    prompt_file = "built-in";
+                    prompt_file = "prompt.txt";
         unsigned ctx_size = 1012,
                  pool_size = 2,
                  threads = 4,

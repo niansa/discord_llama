@@ -4,7 +4,7 @@ token MTA0MDYxMTQzNjUwNzk1OTMyNw.Gl_iMU.jVVM3bRqBJVi8ORVpWHquOivlASGJpRySt8qFg
 language EN
 inference_model 13B-ggml-model-quant.bin
 translation_model 13B-ggml-model-quant.bin
-prompt_file built-in
+prompt_file prompt.txt
 mlock false
 pool_size 2
 threads 4
