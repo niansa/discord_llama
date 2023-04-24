@@ -9,3 +9,4 @@ pool_size 2
 threads 4
 persistance true
 ctx_size 1012
+prompt_file built-in

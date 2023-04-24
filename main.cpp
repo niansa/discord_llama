@@ -16,6 +16,7 @@
 #include <mutex>
 #include <memory>
 #include <dpp/dpp.h>
+#include <fmt/format.h>
 #include <justlm.hpp>
 #include <justlm_pool.hpp>
 #include <anyproc.hpp>
@@ -219,21 +220,38 @@ class Bot {
             LM::Inference llm(config.inference_model, llm_get_params());
             std::ofstream f("init_cache", std::ios::binary);
             // Add initial context
-            llm.append("History of the discord server.\n"
-                       "Note 1: "+bot.me.username+" is a friendly chatbot that is always happy to talk. He is friendly and helpful and always answers immediately. He has a good sense of humor and likes everyone. His age is unknown.\n"
-                       "Note 2: Ecki's real name is Eckhard Kohlhuber and he comes from Bavaria.\n" // Little easter egg
-                       "\n"
-                       "This is the #meta channel.\n"
-                       "Bob: "+bot.me.username+" have you ever been to France and if yes where?\n"
-                       +bot.me.username+": I was in Paris, in the museums!\n"
-                       "Bob: "+bot.me.username+" what are you exactly?\n"
-                       +bot.me.username+": I am "+bot.me.username+", your chatbot! I can answer questions and increase the activity of the server.\n"
-                       "Bob: Shall we talk about sex? "+bot.me.username+"?\n"
-                       +bot.me.username+": No! I will **not** talk about any NSFW topics.\n"
-                       "Bob: "+bot.me.username+" How are you?\n"
-                       +bot.me.username+": I am quite well! :-)\n"
-                       "Ecki: Hey "+bot.me.username+", what is 10 times 90??\n"
-                       +bot.me.username+": that is 900!\n", show_console_progress);
+            if (config.prompt_file == "built-in") {
+                llm.append("History of the discord server.\n"
+                           "Note 1: "+bot.me.username+" is a friendly chatbot that is always happy to talk. He is friendly and helpful and always answers immediately. He has a good sense of humor and likes everyone. His age is unknown.\n"
+                           "Note 2: Ecki's real name is Eckhard Kohlhuber and he comes from Bavaria.\n" // Little easter egg
+                           "\n"
+                           "This is the #meta channel.\n"
+                           "Bob: "+bot.me.username+" have you ever been to France and if yes where?\n"
+                           +bot.me.username+": I was in Paris, in the museums!\n"
+                           "Bob: "+bot.me.username+" what are you exactly?\n"
+                           +bot.me.username+": I am "+bot.me.username+", your chatbot! I can answer questions and increase the activity of the server.\n"
+                           "Bob: Shall we talk about sex? "+bot.me.username+"?\n"
+                           +bot.me.username+": No! I will **not** talk about any NSFW topics.\n"
+                           "Bob: "+bot.me.username+" How are you?\n"
+                           +bot.me.username+": I am quite well! :-)\n"
+                           "Ecki: Hey "+bot.me.username+", what is 10 times 90??\n"
+                           +bot.me.username+": that is 900!\n", show_console_progress);
+            } else {
+                // Read file
+                std::string prompt;
+                {
+                    std::ifstream f(config.prompt_file);
+                    if (!f) {
+                        throw std::runtime_error("Failed to open prompt file.");
+                    }
+                    std::ostringstream sstr;
+                    sstr << f.rdbuf();
+                    prompt = sstr.str();
+                }
+                // Append
+                using namespace fmt::literals;
+                llm.append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username));
+            }
             // Serialize end result
             llm.serialize(f);
         }
@@ -343,7 +361,8 @@ public:
         std::string token,
                     language = "EN",
                     inference_model = "13B-ggml-model-quant.bin",
-                    translation_model = "13B-ggml-model-quant.bin";
+                    translation_model = "13B-ggml-model-quant.bin",
+                    prompt_file = "built-in";
         unsigned ctx_size = 1012,
                  pool_size = 2,
                  threads = 4,
@@ -463,6 +482,8 @@ int main(int argc, char **argv) {
             cfg.inference_model = std::move(value);
         } else if (key == "translation_model") {
             cfg.translation_model = std::move(value);
+        } else if (key == "prompt_file") {
+            cfg.prompt_file = std::move(value);
         } else if (key == "pool_size") {
             cfg.pool_size = std::stoi(value);
         } else if (key == "threads") {
