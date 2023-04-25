@@ -398,7 +398,11 @@ private:
             std::cout << std::endl;
             // Handle timeout
             if (timeout_exceeded) {
-                output = texts.timeout;
+                if (config.live_edit) {
+                    output += "...";
+                } else {
+                    output = texts.timeout;
+                }
             }
             // Send resulting message
             msg.content = llm_translate_from_en(output, channel_cfg.model_config->no_translate);
