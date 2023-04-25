@@ -459,7 +459,7 @@ public:
         if (language != "EN") {
             thread_pool.submit([this] () {
                 std::cout << "Preparing translator..." << std::endl;
-                translator = std::make_unique<Translator>(config.translation_model, llm_get_translation_params());
+                translator = std::make_unique<Translator>(config.translation_model_cfg->weight_path, llm_get_translation_params());
             });
         }
 
