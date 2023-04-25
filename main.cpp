@@ -296,7 +296,7 @@ private:
                     std::ifstream f(config.instruct_prompt_file);
                     if (!f) {
                         // Clean up and abort on error
-                        std::cerr << "Error: Failed to open prompt file." << std::endl;
+                        std::cerr << "Error: Failed to open instruct prompt file." << std::endl;
                         abort();
                     }
                     std::ostringstream sstr;
