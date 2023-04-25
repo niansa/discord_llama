@@ -83,6 +83,7 @@ public:
         std::string weight_path,
                     user_prompt,
                     bot_prompt;
+        bool emits_eos = false;
         enum class InstructModePolicy {
             Allow = 0b11,
             Force = 0b10,
@@ -704,6 +705,8 @@ int main(int argc, char **argv) {
                 model_cfg.bot_prompt = std::move(value);
             } else if (key == "instruct_mode_policy") {
                 model_cfg.instruct_mode_policy = parse_instruct_mode_policy(value);
+            } else if (key == "emits_eos") {
+                model_cfg.emits_eos = parse_bool(value);
             } else if (!key.empty() && key[0] != '#') {
                 std::cerr << "Failed to parse model configuration file: Unknown key: " << key << std::endl;
                 exit(-3);
