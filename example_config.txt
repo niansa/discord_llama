@@ -4,6 +4,7 @@ token MTA0MDYxMTQzNjUwNzk1OTMyNw.Gl_iMU.jVVM3bRqBJVi8ORVpWHquOivlASGJpRySt8qFg
 models_dir models
 language EN
 threads_only true
+live_edit false
 
 default_inference_model 13B-vanilla
 translation_model none

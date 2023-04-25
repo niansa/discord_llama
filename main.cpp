@@ -115,6 +115,7 @@ public:
                  threads = 4,
                  persistance = true;
         bool mlock = false,
+             live_edit = false,
              threads_only = true;
         const ModelConfig *default_inference_model_cfg = nullptr,
                           *translation_model_cfg = nullptr;
@@ -267,7 +268,7 @@ private:
                     std::ifstream f(config.prompt_file);
                     if (!f) {
                         // Clean up and abort on error
-                        std::cerr << "Failed to open prompt file." << std::endl;
+                        std::cerr << "Error: Failed to open prompt file." << std::endl;
                         abort();
                     }
                     std::ostringstream sstr;
@@ -295,7 +296,7 @@ private:
                     std::ifstream f(config.instruct_prompt_file);
                     if (!f) {
                         // Clean up and abort on error
-                        std::cerr << "Failed to open prompt file." << std::endl;
+                        std::cerr << "Error: Failed to open prompt file." << std::endl;
                         abort();
                     }
                     std::ostringstream sstr;
@@ -374,13 +375,22 @@ private:
             prompt_add_trigger(inference, channel_cfg);
             // Run model
             Timer timeout;
+            Timer edit_timer;
             bool timeout_exceeded = false;
-            auto output = inference.run(channel_cfg.instruct_mode?channel_cfg.model_config->user_prompt:"\n", [&] (std::string_view str) {
-                std::cout << str << std::flush;
+            msg.content.clear();
+            auto output = inference.run(channel_cfg.instruct_mode?channel_cfg.model_config->user_prompt:"\n", [&] (std::string_view token) {
+                std::cout << token << std::flush;
                 if (timeout.get<std::chrono::minutes>() > 2) {
                     timeout_exceeded = true;
                     std::cerr << "\nWarning: Timeout exceeded generating message";
                     return false;
+                }
+                if (config.live_edit) {
+                    msg.content += token;
+                    if (edit_timer.get<std::chrono::seconds>() > 5) {
+                        bot.message_edit(msg);
+                        edit_timer.reset();
+                    }
                 }
                 return true;
             });
@@ -602,7 +612,7 @@ bool parse_bool(const std::string& value) {
         return true;
     if (value == "false")
         return false;
-    std::cerr << "Failed to parse configuration file: Unknown bool (true/false): " << value << std::endl;
+    std::cerr << "Error: Failed to parse configuration file: Unknown bool (true/false): " << value << std::endl;
     exit(-4);
 }
 Bot::ModelConfig::InstructModePolicy parse_instruct_mode_policy(const std::string& value) {
@@ -612,7 +622,7 @@ Bot::ModelConfig::InstructModePolicy parse_instruct_mode_policy(const std::strin
         return Bot::ModelConfig::InstructModePolicy::Force;
     if (value == "forbid")
         return Bot::ModelConfig::InstructModePolicy::Forbid;
-    std::cerr << "Failed to parse model configuration file: Unknown instruct mode policy (allow/force/forbid): " << value << std::endl;
+    std::cerr << "Error: Failed to parse model configuration file: Unknown instruct mode policy (allow/force/forbid): " << value << std::endl;
     exit(-4);
 }
 
@@ -633,7 +643,7 @@ int main(int argc, char **argv) {
     Bot::Configuration cfg;
     std::ifstream cfgf(argv[1]);
     if (!cfgf) {
-        std::cerr << "Failed to open configuration file: " << argv[1] << std::endl;
+        std::cerr << "Error: Failed to open configuration file: " << argv[1] << std::endl;
         exit(-1);
     }
     for (std::string key; cfgf >> key;) {
@@ -665,12 +675,14 @@ int main(int argc, char **argv) {
             cfg.ctx_size = std::stoi(value);
         } else if (key == "mlock") {
             cfg.mlock = parse_bool(value);
+        } else if (key == "live_edit") {
+            cfg.live_edit = parse_bool(value);
         } else if (key == "threads_only") {
             cfg.threads_only = parse_bool(value);
         } else if (key == "persistance") {
             cfg.persistance = parse_bool(value);
         } else if (!key.empty() && key[0] != '#') {
-            std::cerr << "Failed to parse configuration file: Unknown key: " << key << std::endl;
+            std::cerr << "Error: Failed to parse configuration file: Unknown key: " << key << std::endl;
             exit(-3);
         }
     }
@@ -691,7 +703,7 @@ int main(int argc, char **argv) {
         Bot::ModelConfig model_cfg;
         std::ifstream cfgf(file.path());
         if (!cfgf) {
-            std::cerr << "Failed to open model configuration file: " << file << std::endl;
+            std::cerr << "Error: Failed to open model configuration file: " << file << std::endl;
             exit(-2);
         }
         std::string filename;
@@ -713,7 +725,7 @@ int main(int argc, char **argv) {
             } else if (key == "emits_eos") {
                 model_cfg.emits_eos = parse_bool(value);
             } else if (!key.empty() && key[0] != '#') {
-                std::cerr << "Failed to parse model configuration file: Unknown key: " << key << std::endl;
+                std::cerr << "Error: Failed to parse model configuration file: Unknown key: " << key << std::endl;
                 exit(-3);
             }
         }
@@ -721,12 +733,12 @@ int main(int argc, char **argv) {
         model_cfg.weight_path = file.path().parent_path()/filename;
         // Safety checks
         if (filename.empty() || !file_exists(model_cfg.weight_path)) {
-            std::cerr << "Failed to parse model configuration file: Invalid weight filename: " << model_name << std::endl;
+            std::cerr << "Error: Failed to parse model configuration file: Invalid weight filename: " << model_name << std::endl;
             exit(-8);
         }
         if (model_cfg.instruct_mode_policy != Bot::ModelConfig::InstructModePolicy::Forbid &&
             (model_cfg.user_prompt.empty() || model_cfg.bot_prompt.empty())) {
-            std::cerr << "Failed to parse model configuration file: Instruct mode allowed but user prompt and bot prompt not given: " << model_name << std::endl;
+            std::cerr << "Error: Failed to parse model configuration file: Instruct mode allowed but user prompt and bot prompt not given: " << model_name << std::endl;
             exit(-9);
         }
         if (model_cfg.instruct_mode_policy != Bot::ModelConfig::InstructModePolicy::Force) {
@@ -744,25 +756,28 @@ int main(int argc, char **argv) {
     // Safety checks
     if (cfg.language != "EN") {
         if (cfg.translation_model_cfg == nullptr) {
-            std::cerr << "Translation model required for non-english language, but is invalid" << std::endl;
+            std::cerr << "Error: Translation model required for non-english language, but is invalid" << std::endl;
             exit(-5);
         }
         if (cfg.translation_model_cfg->instruct_mode_policy == Bot::ModelConfig::InstructModePolicy::Force) {
-            std::cerr << "Translation model is required to not have instruct mode forced" << std::endl;
+            std::cerr << "Error: Translation model is required to not have instruct mode forced" << std::endl;
             exit(-10);
+        }
+        if (cfg.translation_model_cfg->instruct_mode_policy == Bot::ModelConfig::InstructModePolicy::Force) {
+            std::cerr << "Warning: Live edit should not be enabled for non-english language" << std::endl;
         }
     }
     if (allow_non_instruct && !file_exists(cfg.prompt_file)) {
-        std::cerr << "Prompt file required when allowing non-instruct-mode use, but is invalid" << std::endl;
+        std::cerr << "Error: Prompt file required when allowing non-instruct-mode use, but is invalid" << std::endl;
         exit(-11);
     }
     if (!cfg.threads_only) {
         if (cfg.default_inference_model_cfg == nullptr) {
-            std::cerr << "Default model required if not threads only, but is invalid" << std::endl;
+            std::cerr << "Error: Default model required if not threads only, but is invalid" << std::endl;
             exit(-6);
         }
         if (cfg.default_inference_model_cfg->instruct_mode_policy == Bot::ModelConfig::InstructModePolicy::Force) {
-            std::cerr << "Default model must not have instruct mode forced if not threads only" << std::endl;
+            std::cerr << "Error: Default model must not have instruct mode forced if not threads only" << std::endl;
             exit(-7);
         }
     }
