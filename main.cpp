@@ -50,7 +50,7 @@ void str_replace_in_place(std::string& subject, std::string_view search,
 }
 
 static
-void clean_command_name(std::string& value) {
+void clean_for_command_name(std::string& value) {
     for (auto& c : value) {
         if (c == '.') c = '_';
         if (isalpha(c)) c = tolower(c);
@@ -59,7 +59,7 @@ void clean_command_name(std::string& value) {
 [[nodiscard]] static
 std::string clean_command_name(std::string_view input) {
     std::string fres(input);
-    clean_command_name(fres);
+    clean_for_command_name(fres);
     return fres;
 }
 
@@ -305,7 +305,7 @@ private:
                 // Append
                 using namespace fmt::literals;
                 if (prompt.back() != '\n') prompt.push_back('\n');
-                llm.append(fmt::format(fmt::runtime(prompt+'\n'), "bot_name"_a=bot.me.username), show_console_progress);
+                llm.append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username)+"\n\n"+model_config.user_prompt, show_console_progress);
                 // Serialize end result
                 std::ofstream f(filename, std::ios::binary);
                 llm.serialize(f);
@@ -327,7 +327,7 @@ private:
             std::string prefix;
             // Instruct mode user prompt
             if (channel_cfg.instruct_mode) {
-                inference.append('\n'+channel_cfg.model_config->user_prompt+"\n\n");
+                inference.append("\n\n");
             } else {
                 prefix = msg.author.username+": ";
             }
@@ -375,7 +375,7 @@ private:
             // Run model
             Timer timeout;
             bool timeout_exceeded = false;
-            auto output = inference.run("\n", [&] (std::string_view str) {
+            auto output = inference.run(channel_cfg.instruct_mode?channel_cfg.model_config->user_prompt:"\n", [&] (std::string_view str) {
                 std::cout << str << std::flush;
                 if (timeout.get<std::chrono::minutes>() > 2) {
                     timeout_exceeded = true;
@@ -385,13 +385,18 @@ private:
                 return true;
             });
             std::cout << std::endl;
-            inference.append("\n");
+            // Handle timeout
             if (timeout_exceeded) {
+                inference.append("\n");
                 output = texts.timeout;
             }
             // Send resulting message
             msg.content = llm_translate_from_en(output);
             bot.message_edit(msg);
+            // Prepare for next message
+            if (channel_cfg.model_config->emits_eos) {
+                inference.append("\n\n"+channel_cfg.model_config->user_prompt);
+            }
         } catch (const std::exception& e) {
             std::cerr << "Warning: " << e.what() << std::endl;
         }
@@ -681,7 +686,7 @@ int main(int argc, char **argv) {
         // Get model name
         auto model_name = file.path().filename().string();
         model_name.erase(model_name.size()-4, 4);
-        clean_command_name(model_name);
+        clean_for_command_name(model_name);
         // Parse model config
         Bot::ModelConfig model_cfg;
         std::ifstream cfgf(file.path());
@@ -763,8 +768,8 @@ int main(int argc, char **argv) {
     }
 
     // Clean model names in config
-    clean_command_name(cfg.default_inference_model);
-    clean_command_name(cfg.translation_model);
+    clean_for_command_name(cfg.default_inference_model);
+    clean_for_command_name(cfg.translation_model);
 
     // Construct and configure bot
     Bot bot(cfg, models);
