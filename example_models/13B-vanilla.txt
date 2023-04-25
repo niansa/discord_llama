@@ -1,0 +1,2 @@
+filename 13B-ggml-model-quant.bin
+instruct_mode_policy forbid

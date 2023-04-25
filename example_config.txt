@@ -1,12 +1,18 @@
 token MTA0MDYxMTQzNjUwNzk1OTMyNw.Gl_iMU.jVVM3bRqBJVi8ORVpWHquOivlASGJpRySt8qFg
 
 # The following parameters are set to their defaults here and can be ommited
+models_dir models
 language EN
-inference_model 13B-ggml-model-quant.bin
-translation_model 13B-ggml-model-quant.bin
-prompt_file prompt.txt
+threads_only true
+
+default_inference_model 13B-vanilla
+translation_model none
+
+prompt_file none
+instruct_prompt_file none
+
+persistance true
 mlock false
 pool_size 2
 threads 4
-persistance true
 ctx_size 1012
