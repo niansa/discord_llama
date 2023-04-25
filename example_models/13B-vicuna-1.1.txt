@@ -1,4 +1,4 @@
 filename ggml-vicuna-13b-1.1-q4_0.bin
 instruct_mode_policy force
-user_prompt HUMAN:
+user_prompt USER:
 bot_prompt ASSISTANT:
