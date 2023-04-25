@@ -398,15 +398,15 @@ private:
             std::cout << std::endl;
             // Handle timeout
             if (timeout_exceeded) {
-                inference.append("\n");
                 output = texts.timeout;
             }
             // Send resulting message
             msg.content = llm_translate_from_en(output, channel_cfg.model_config->no_translate);
             bot.message_edit(msg);
             // Prepare for next message
+            inference.append("\n");
             if (channel_cfg.model_config->emits_eos) {
-                inference.append("\n\n"+channel_cfg.model_config->user_prompt);
+                inference.append("\n"+channel_cfg.model_config->user_prompt);
             }
         } catch (const std::exception& e) {
             std::cerr << "Warning: " << e.what() << std::endl;
