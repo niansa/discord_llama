@@ -284,14 +284,9 @@ class Bot {
     }
 
     // Must run in llama thread
-    void reply(dpp::snowflake id, const std::function<void ()>& after_placeholder_creation = nullptr) {
+    void reply(dpp::snowflake id, dpp::message msg) {
         ENSURE_LLM_THREAD();
-        try {
-            // Create placeholder message
-            auto msg = bot.message_create_sync(dpp::message(id, texts.please_wait+" :thinking:"));
-            // Call after_placeholder_creation callback
-            if (after_placeholder_creation) after_placeholder_creation();
-            // Trigger LLM  correctly
+        try {            // Trigger LLM  correctly
             prompt_add_trigger(id);
             // Get inference
             auto& inference = llm_get_inference(id);
@@ -320,18 +315,16 @@ class Bot {
         }
     }
 
-    // Must run in llama thread
-    bool attempt_reply(const dpp::message& msg, const std::function<void ()>& after_placeholder_creation = nullptr) {
-        ENSURE_LLM_THREAD();
+    bool attempt_reply(const dpp::message& msg) {
         // Reply if message contains username, mention or ID
         if (msg.content.find(bot.me.username) != std::string::npos) {
-            reply(msg.channel_id, after_placeholder_creation);
+            enqueue_reply(msg.channel_id);
             return true;
         }
         // Reply if message references user
         for (const auto msg_id : my_messages) {
             if (msg.message_reference.message_id == msg_id) {
-                reply(msg.channel_id, after_placeholder_creation);
+                enqueue_reply(msg.channel_id);
                 return true;
             }
         }
@@ -340,7 +333,10 @@ class Bot {
     }
 
     void enqueue_reply(dpp::snowflake id) {
-        tPool.submit(std::bind(&Bot::reply, this, id, nullptr));
+        bot.message_create(dpp::message(id, texts.please_wait+" :thinking:"), [this, id] (const dpp::confirmation_callback_t& ccb) {
+            if (ccb.is_error()) return;
+            tPool.submit(std::bind(&Bot::reply, this, id, ccb.get<dpp::message>()));
+        });
     }
 
 public:
@@ -397,38 +393,28 @@ public:
                 return;
             }
             // Move on in another thread
-            tPool.submit([this, msg = event.msg] () mutable {
-                try {
-                    // Replace bot mentions with bot username
-                    str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
-                    // Replace all other known users
-                    for (const auto& [user_id, user] : users) {
-                        str_replace_in_place(msg.content, "<@"+std::to_string(user_id)+'>', user.username);
-                    }
-                    // Handle message somehow...
-                    if (msg.content == "!trigger") {
-                        // Delete message
-                        bot.message_delete(msg.id, msg.channel_id);
-                        // Send a reply
-                        reply(msg.channel_id);
-                    } else {
-                        tPool.submit([=, this] () {
-                            // Attempt to send a reply
-                            bool replied = attempt_reply(msg, [=, this] () {
-                                // Append message to history
-                                prompt_add_msg(msg);
-                            });
-                            // If none was send, still append message to history.
-                            if (!replied) {
-                                // Append message to history
-                                prompt_add_msg(msg);
-                            }
-                        });
-                    }
-                } catch (const std::exception& e) {
-                    std::cerr << "Warning: " << e.what() << std::endl;
+            try {
+                dpp::message msg = event.msg;
+                // Replace bot mentions with bot username
+                str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
+                // Replace all other known users
+                for (const auto& [user_id, user] : users) {
+                    str_replace_in_place(msg.content, "<@"+std::to_string(user_id)+'>', user.username);
                 }
-            });
+                // Append message
+                tPool.submit(std::bind(&Bot::prompt_add_msg, this, msg));
+                // Handle message somehow...
+                if (msg.content == "!trigger") {
+                    // Delete message
+                    bot.message_delete(msg.id, msg.channel_id);
+                    // Send a reply
+                    enqueue_reply(msg.channel_id);
+                } else {
+                    attempt_reply(msg);
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "Warning: " << e.what() << std::endl;
+            }
         });
     }
 
