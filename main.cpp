@@ -763,7 +763,7 @@ int main(int argc, char **argv) {
             std::cerr << "Error: Translation model is required to not have instruct mode forced" << std::endl;
             exit(-10);
         }
-        if (cfg.translation_model_cfg->instruct_mode_policy == Bot::ModelConfig::InstructModePolicy::Force) {
+        if (cfg.live_edit) {
             std::cerr << "Warning: Live edit should not be enabled for non-english language" << std::endl;
         }
     }
