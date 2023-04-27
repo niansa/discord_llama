@@ -261,7 +261,7 @@ private:
             if (model_config.is_non_instruct_mode_allowed() &&
                     !std::filesystem::exists(filename) && config.prompt_file != "none") {
                 std::cout << "Building init_cache for "+model_name+"..." << std::endl;
-                LM::Inference llm(model_config.weight_path, llm_get_params());
+                auto llm = LM::Inference::construct(model_config.weight_path, llm_get_params());
                 // Add initial context
                 std::string prompt;
                 {
@@ -279,17 +279,17 @@ private:
                 // Append
                 using namespace fmt::literals;
                 if (prompt.back() != '\n') prompt.push_back('\n');
-                llm.append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username), show_console_progress);
+                llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username), show_console_progress);
                 // Serialize end result
                 std::ofstream f(filename, std::ios::binary);
-                llm.serialize(f);
+                llm->serialize(f);
             }
             // Instruct prompt
             filename = model_name+"_instruct_init_cache";
             if (model_config.is_instruct_mode_allowed() &&
                     !std::filesystem::exists(filename) && config.instruct_prompt_file != "none") {
                 std::cout << "Building instruct_init_cache for "+model_name+"..." << std::endl;
-                LM::Inference llm(model_config.weight_path, llm_get_params());
+                auto llm = LM::Inference::construct(model_config.weight_path, llm_get_params());
                 // Add initial context
                 std::string prompt;
                 {
@@ -307,10 +307,10 @@ private:
                 // Append
                 using namespace fmt::literals;
                 if (prompt.back() != '\n') prompt.push_back('\n');
-                llm.append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username)+"\n\n"+model_config.user_prompt, show_console_progress);
+                llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username)+"\n\n"+model_config.user_prompt, show_console_progress);
                 // Serialize end result
                 std::ofstream f(filename, std::ios::binary);
-                llm.serialize(f);
+                llm->serialize(f);
             }
         }
         // Report complete init
