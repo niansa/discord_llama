@@ -56,12 +56,6 @@ void clean_for_command_name(std::string& value) {
         if (isalpha(c)) c = tolower(c);
     }
 }
-[[nodiscard]] static
-std::string clean_command_name(std::string_view input) {
-    std::string fres(input);
-    clean_for_command_name(fres);
-    return fres;
-}
 
 
 class Bot {
@@ -644,8 +638,10 @@ int main(int argc, char **argv) {
             cfg.language = std::move(value);
         } else if (key == "default_inference_model") {
             cfg.default_inference_model = std::move(value);
+            clean_for_command_name(cfg.default_inference_model);
         } else if (key == "translation_model") {
             cfg.translation_model = std::move(value);
+            clean_for_command_name(cfg.translation_model);
         } else if (key == "prompt_file") {
             cfg.prompt_file = std::move(value);
         } else if (key == "instruct_prompt_file") {
@@ -770,10 +766,6 @@ int main(int argc, char **argv) {
             exit(-7);
         }
     }
-
-    // Clean model names in config
-    clean_for_command_name(cfg.default_inference_model);
-    clean_for_command_name(cfg.translation_model);
 
     // Construct and configure bot
     Bot bot(cfg, models);
