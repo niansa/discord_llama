@@ -16,4 +16,5 @@ persistance true
 mlock false
 pool_size 2
 threads 4
+timeout 120
 ctx_size 1012

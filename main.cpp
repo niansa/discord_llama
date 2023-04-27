@@ -113,6 +113,7 @@ public:
                     models_dir = "models";
         unsigned ctx_size = 1012,
                  pool_size = 2,
+                 timeout = 120,
                  threads = 4,
                  persistance = true;
         bool mlock = false,
@@ -328,7 +329,7 @@ private:
             Timer timeout;
             bool timeout_exceeded = false;
             inference.append(prefix+std::string(llm_translate_to_en(line, channel_cfg.model_config->no_translate))+'\n', [&] (float progress) {
-                if (timeout.get<std::chrono::minutes>() > 1) {
+                if (timeout.get<std::chrono::seconds>() > config.timeout) {
                     std::cerr << "\nWarning: Timeout exceeded processing message" << std::endl;
                     timeout_exceeded = true;
                     return false;
@@ -363,7 +364,7 @@ private:
             msg.content.clear();
             auto output = inference.run(channel_cfg.instruct_mode?channel_cfg.model_config->user_prompt:"\n", [&] (std::string_view token) {
                 std::cout << token << std::flush;
-                if (timeout.get<std::chrono::minutes>() > 2) {
+                if (timeout.get<std::chrono::seconds>() > config.timeout) {
                     timeout_exceeded = true;
                     std::cerr << "\nWarning: Timeout exceeded generating message";
                     return false;
@@ -658,6 +659,8 @@ int main(int argc, char **argv) {
             cfg.pool_size = std::stoi(value);
         } else if (key == "threads") {
             cfg.threads = std::stoi(value);
+        } else if (key == "timeout") {
+            cfg.timeout = std::stoi(value);
         } else if (key == "ctx_size") {
             cfg.ctx_size = std::stoi(value);
         } else if (key == "mlock") {
