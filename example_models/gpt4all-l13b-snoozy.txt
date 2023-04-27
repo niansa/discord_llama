@@ -3,3 +3,4 @@ instruct_mode_policy allow
 user_prompt ### Question:
 bot_prompt ### Response:
 emits_eos true
+no_translate true

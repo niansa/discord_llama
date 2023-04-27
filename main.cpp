@@ -544,7 +544,8 @@ public:
                 // Get channel config
                 BotChannelConfig channel_cfg;
                 // Attempt to find thread first...
-                bool in_bot_thread = false;
+                bool in_bot_thread = false,
+                     model_missing = false;
                 db << "SELECT model, instruct_mode FROM threads "
                       "WHERE id = ?;"
                         << std::to_string(msg.channel_id)
@@ -555,11 +556,13 @@ public:
                     auto res = model_configs.find(model_name);
                     if (res == model_configs.end()) {
                         bot.message_create(dpp::message(msg.channel_id, texts.model_missing));
+                        model_missing = true;
                         return;
                     }
                     channel_cfg.model_name = &res->first;
                     channel_cfg.model_config = &res->second;
                 };
+                if (model_missing) return;
                 // Otherwise just fall back to the default model config if allowed
                 if (!in_bot_thread) {
                     if (config.threads_only) return;
