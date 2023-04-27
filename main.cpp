@@ -157,12 +157,7 @@ private:
         // Replace bot username with [43]
         str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
-        try {
-            fres = translator->translate(fres, "EN", show_console_progress);
-        } catch (const LM::Inference::ContextLengthException&) {
-            // Handle potential context overflow error
-            return "(Translation impossible)";
-        }
+        fres = translator->translate(fres, "EN", show_console_progress);
         // Replace [43] back with bot username
         str_replace_in_place(fres, "[43]", bot.me.username);
         std::cout << text << " --> (EN) " << fres << std::endl;
@@ -183,12 +178,7 @@ private:
         // Replace bot username with [43]
         str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
-        try {
-            fres = translator->translate(fres, language, show_console_progress);
-        } catch (const LM::Inference::ContextLengthException&) {
-            // Handle potential context overflow error
-            return "(Translation impossible)";
-        }
+        fres = translator->translate(fres, language, show_console_progress);
         // Replace [43] back with bot username
         str_replace_in_place(fres, "[43]", bot.me.username);
         std::cout << text << " --> (" << language << ") " << fres << std::endl;
@@ -203,9 +193,9 @@ private:
     }
     LM::Inference::Params llm_get_params(bool instruct_mode = false) const {
         return {
-            .n_threads = int(config.threads),
-            .n_ctx = int(config.ctx_size),
-            .n_repeat_last = instruct_mode?0:256,
+            .n_threads = config.threads,
+            .n_ctx = config.ctx_size,
+            .n_repeat_last = unsigned(instruct_mode?0:256),
             .temp = 0.3f,
             .repeat_penalty = instruct_mode?1.0f:1.372222224f,
             .use_mlock = config.mlock
@@ -219,6 +209,7 @@ private:
         if (channel_cfg.instruct_mode && config.instruct_prompt_file == "none") return;
         std::ifstream f((*channel_cfg.model_name)+(channel_cfg.instruct_mode?"_instruct_init_cache":"_init_cache"), std::ios::binary);
         inference.deserialize(f);
+        inference.params.n_ctx_window_top_bar = inference.get_context_size();
     }
     // Must run in llama thread
     LM::Inference &llm_start(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
@@ -325,44 +316,35 @@ private:
         }
         // Get inference
         auto& inference = llm_get_inference(msg.channel_id, channel_cfg);
-        try {
-            std::string prefix;
-            // Instruct mode user prompt
-            if (channel_cfg.instruct_mode) {
-                inference.append("\n\n");
-            } else {
-                prefix = msg.author.username+": ";
-            }
-            // Format and append lines
-            for (const auto line : str_split(msg.content, '\n')) {
-                Timer timeout;
-                bool timeout_exceeded = false;
-                inference.append(prefix+std::string(llm_translate_to_en(line, channel_cfg.model_config->no_translate))+'\n', [&] (float progress) {
-                    if (timeout.get<std::chrono::minutes>() > 1) {
-                        std::cerr << "\nWarning: Timeout exceeded processing message" << std::endl;
-                        timeout_exceeded = true;
-                        return false;
-                    }
-                    return show_console_progress(progress);
-                });
-                if (timeout_exceeded) inference.append("\n");
-            }
-        } catch (const LM::Inference::ContextLengthException&) {
-            llm_restart(inference, channel_cfg);
-            prompt_add_msg(msg, channel_cfg);
+        std::string prefix;
+        // Instruct mode user prompt
+        if (channel_cfg.instruct_mode) {
+            inference.append("\n\n");
+        } else {
+            prefix = msg.author.username+": ";
+        }
+        // Format and append lines
+        for (const auto line : str_split(msg.content, '\n')) {
+            Timer timeout;
+            bool timeout_exceeded = false;
+            inference.append(prefix+std::string(llm_translate_to_en(line, channel_cfg.model_config->no_translate))+'\n', [&] (float progress) {
+                if (timeout.get<std::chrono::minutes>() > 1) {
+                    std::cerr << "\nWarning: Timeout exceeded processing message" << std::endl;
+                    timeout_exceeded = true;
+                    return false;
+                }
+                return show_console_progress(progress);
+            });
+            if (timeout_exceeded) inference.append("\n");
         }
     }
     // Must run in llama thread
     void prompt_add_trigger(LM::Inference& inference, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
-        try {
-            if (channel_cfg.instruct_mode) {
-                inference.append('\n'+channel_cfg.model_config->bot_prompt+"\n\n");
-            } else {
-                inference.append(bot.me.username+':', show_console_progress);
-            }
-        } catch (const LM::Inference::ContextLengthException&) {
-            llm_restart(inference, channel_cfg);
+        if (channel_cfg.instruct_mode) {
+            inference.append('\n'+channel_cfg.model_config->bot_prompt+"\n\n");
+        } else {
+            inference.append(bot.me.username+':', show_console_progress);
         }
     }
 
