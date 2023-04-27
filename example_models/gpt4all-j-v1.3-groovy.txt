@@ -1,0 +1,5 @@
+filename ggml-gpt4all-j-v1.3-groovy.bin
+instruct_mode_policy force
+user_prompt ### Question:
+bot_prompt ### Response:
+emits_eos true
