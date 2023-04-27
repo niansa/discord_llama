@@ -318,26 +318,29 @@ private:
         // Get inference
         auto& inference = llm_get_inference(msg.channel_id, channel_cfg);
         std::string prefix;
+        // Define callback for console progress and timeout
+        Timer timeout;
+        bool timeout_exceeded = false;
+        const auto cb = [&] (float progress) {
+            if (timeout.get<std::chrono::minutes>() > 1) {
+                std::cerr << "\nWarning: Timeout exceeded processing message" << std::endl;
+                timeout_exceeded = true;
+                return false;
+            }
+            return show_console_progress(progress);
+        };
         // Instruct mode user prompt
         if (channel_cfg.instruct_mode) {
-            inference.append("\n\n");
+            // Append line as-is
+            inference.append("\n\n"+std::string(llm_translate_to_en(msg.content))+'\n', cb);
         } else {
-            prefix = msg.author.username+": ";
+            // Format and append lines
+            for (const auto line : str_split(msg.content, '\n')) {
+                inference.append(msg.author.username+": "+std::string(llm_translate_to_en(line, channel_cfg.model_config->no_translate))+'\n', cb);
+            }
         }
-        // Format and append lines
-        for (const auto line : str_split(msg.content, '\n')) {
-            Timer timeout;
-            bool timeout_exceeded = false;
-            inference.append(prefix+std::string(llm_translate_to_en(line, channel_cfg.model_config->no_translate))+'\n', [&] (float progress) {
-                if (timeout.get<std::chrono::seconds>() > config.timeout) {
-                    std::cerr << "\nWarning: Timeout exceeded processing message" << std::endl;
-                    timeout_exceeded = true;
-                    return false;
-                }
-                return show_console_progress(progress);
-            });
-            if (timeout_exceeded) inference.append("\n");
-        }
+        // Append line break on timeout
+        if (timeout_exceeded) inference.append("\n");
     }
     // Must run in llama thread
     void prompt_add_trigger(LM::Inference& inference, const BotChannelConfig& channel_cfg) {
