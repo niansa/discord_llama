@@ -1,0 +1,5 @@
+filename ggml-gpt4all-l13b-snoozy.bin
+instruct_mode_policy allow
+user_prompt ### Question:
+bot_prompt ### Response:
+emits_eos true
