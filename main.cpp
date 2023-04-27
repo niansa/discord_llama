@@ -525,6 +525,14 @@ public:
             // Move on in another thread
             try {
                 dpp::message msg = event.msg;
+                // Check for reset command
+                if (msg.content == "!reset") {
+                    // Delete inference from pool
+                    llm_pool.delete_inference(msg.channel_id);
+                    // Delete message
+                    bot.message_delete(msg.id, msg.channel_id);
+                    return;
+                }
                 // Replace bot mentions with bot username
                 str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
                 // Replace all other known users
