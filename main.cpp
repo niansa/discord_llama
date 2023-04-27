@@ -562,12 +562,6 @@ public:
                     channel_cfg.model_name = &config.default_inference_model;
                     channel_cfg.model_config = config.default_inference_model_cfg;
                 }
-                // Debug store command
-                if (msg.content == "!store") {
-                    llm_pool.store_all(); //DEBUG
-#                   warning DEBUG CODE!!!
-                    return;
-                }
                 // Append message
                 thread_pool.submit([=, this] () {
                     prompt_add_msg(msg, channel_cfg);
