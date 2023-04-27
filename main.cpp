@@ -528,7 +528,9 @@ public:
                 // Check for reset command
                 if (msg.content == "!reset") {
                     // Delete inference from pool
-                    llm_pool.delete_inference(msg.channel_id);
+                    thread_pool.submit([this, msg] () {
+                        llm_pool.delete_inference(msg.channel_id);
+                    });
                     // Delete message
                     bot.message_delete(msg.id, msg.channel_id);
                     return;
