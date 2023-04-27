@@ -326,7 +326,7 @@ private:
         // Instruct mode user prompt
         if (channel_cfg.instruct_mode) {
             // Append line as-is
-            inference.append("\n\n"+std::string(llm_translate_to_en(msg.content))+'\n', cb);
+            inference.append("\n\n"+std::string(llm_translate_to_en(msg.content, channel_cfg.model_config->no_translate))+'\n', cb);
         } else {
             // Format and append lines
             for (const auto line : str_split(msg.content, '\n')) {
