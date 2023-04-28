@@ -68,6 +68,7 @@ class Bot {
     std::thread::id llm_tid;
     sqlite::database db;
 
+    std::mutex command_completion_buffer_mutex;
     std::unordered_map<dpp::snowflake, dpp::slashcommand_t> command_completion_buffer;
 
     std::string_view language;
@@ -447,10 +448,13 @@ private:
         return (unsigned(id.get_creation_time()) % config.shard_count) == config.shard_id;
     }
 
+    // This function is responsible for sharding thread creation
+    // A bit ugly but a nice way to avoid having to communicate over any other means than just the Discord API
     void command_completion_handler(dpp::slashcommand_t&& event, dpp::channel *thread = nullptr) {
         // Stop if this is not the correct shard for thread creation
         if (thread == nullptr) {
             // But register this command first
+            std::scoped_lock L(command_completion_buffer_mutex);
             command_completion_buffer.emplace(event.command.id, std::move(event));
             // And then actually stop
             if (!on_own_shard(event.command.channel_id)) return;
@@ -576,6 +580,7 @@ public:
                     return;
                 }
                 // Find command
+                std::scoped_lock L(command_completion_buffer_mutex);
                 auto res = command_completion_buffer.find(command_id);
                 if (res == command_completion_buffer.end()) {
                     return;
