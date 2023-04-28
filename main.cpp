@@ -477,7 +477,7 @@ private:
         }
         // Create thread if it doesn't exist or update it if it does
         if (thread == nullptr) {
-            std::cout << "Send" << std::endl;
+            std::cout << "Responsible for creating thread: " << thread->id << std::endl;
             bot.thread_create(std::to_string(event.command.id), event.command.channel_id, 1440, dpp::CHANNEL_PUBLIC_THREAD, true, 15,
                               [this, event, instruct_mode, model_name = res->first] (const dpp::confirmation_callback_t& ccb) {
                 // Check for error
@@ -496,7 +496,7 @@ private:
             // Stop if this is not the correct shard for thread finalization
             if (!on_own_shard(thread->id)) return;
             // Set name
-            std::cout << "Receive" << std::endl;
+            std::cout << "Responsible for finalizing thread: " << thread->id << std::endl;
             thread->name = "Chat with "+model_name+" "+(instruct_mode?"(Instruct mode)":"");
             bot.channel_edit(*thread);
         }
