@@ -462,7 +462,7 @@ public:
                     dpp::slashcommand command(name, "Start a chat with me", bot.me.id);
                     // Add instruct mode option
                     if (model.instruct_mode_policy == ModelConfig::InstructModePolicy::Allow) {
-                        command.add_option(dpp::command_option(dpp::co_boolean, "instruct_mode", "Weather to enable instruct mode", true));
+                        command.add_option(dpp::command_option(dpp::co_boolean, "instruct_mode", "Weather to enable instruct mode", false));
                     }
                     // Register command
                     bot.global_command_edit(command, [this, command] (const dpp::confirmation_callback_t& ccb) {
@@ -486,8 +486,13 @@ public:
             const auto& [model_name, model_config] = *res;
             // Get weather to enable instruct mode
             bool instruct_mode;
+            const auto& instruct_mode_param = event.get_parameter("instruct_mode");
             if (model_config.instruct_mode_policy == ModelConfig::InstructModePolicy::Allow) {
-                instruct_mode = std::get<bool>(event.get_parameter("instruct_mode"));
+                if (instruct_mode_param.index()) {
+                    instruct_mode = std::get<bool>(instruct_mode_param);
+                } else {
+                    instruct_mode = true;
+                }
             } else {
                 instruct_mode = model_config.instruct_mode_policy == ModelConfig::InstructModePolicy::Force;
             }
