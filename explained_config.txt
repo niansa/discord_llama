@@ -1,0 +1,54 @@
+token MTA0MDYxMTQzNjUwNzk1OTMyNw.Gl_iMU.jVVM3bRqBJVi8ORVpWHquOivlASGJpRySt8qFg
+
+# The following parameters are set to their defaults here and can be ommited
+
+# Directory the models are located in. For example, see example_models/
+models_dir models
+
+# Language everything is translated to (will be disabled if set to "EN" anyways)
+language EN
+
+# Weather the bot should respond to pings outside threads
+threads_only true
+
+# Weather the bot should update messages periodically while writing them. Incompatible with translation
+live_edit false
+
+# Model to use outside threads
+default_inference_model 13b-vanilla
+
+# Model to be used for translation
+translation_model none
+
+# Few-shot prompt for non-instruct-mode. See example_prompt.txt
+prompt_file none
+
+# Prompt for instruct-mode. See example_instruct_prompt.txt
+instruct_prompt_file none
+
+# Amount of shards ("instances") of this bot. This is NOT Discord sharding
+shard_count 1
+
+# Number of this shard. Must be unique in the entire bot
+shard_id 0
+
+# Weather context ("chat histories") should persist restarts
+persistance true
+
+# Weather swapping should be prevented using mlock
+mlock false
+
+# Amount of contexts to keep in RAM at a time
+pool_size 2
+
+# Amount of CPU threads to use
+threads 4
+
+# Response/Evaluation timeout in seconds
+timeout 120
+
+# Max. context size
+ctx_size 1012
+
+# Percentage of context below prompt to be kept when scrolling. 0 means no context will be kept when scolling.
+scroll_keep 20

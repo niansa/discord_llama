@@ -108,6 +108,7 @@ public:
                  pool_size = 2,
                  timeout = 120,
                  threads = 4,
+                 scroll_keep = 20,
                  shard_cout = 1,
                  shard_id = 0;
         bool persistance = true,
@@ -205,7 +206,9 @@ private:
         if (channel_cfg.instruct_mode && config.instruct_prompt_file == "none") return;
         std::ifstream f((*channel_cfg.model_name)+(channel_cfg.instruct_mode?"_instruct_init_cache":"_init_cache"), std::ios::binary);
         inference.deserialize(f);
+        // Set params
         inference.params.n_ctx_window_top_bar = inference.get_context_size();
+        inference.params.scroll_keep = float(config.scroll_keep) * 0.01f;
     }
     // Must run in llama thread
     LM::Inference &llm_start(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
@@ -219,12 +222,20 @@ private:
     // Must run in llama thread
     LM::Inference &llm_get_inference(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
+        // Get inference
         auto inference_opt = llm_pool.get_inference(id);
         if (!inference_opt.has_value()) {
             // Start new inference
             inference_opt = llm_start(id, channel_cfg);
         }
-        return inference_opt.value();
+        auto& fres = inference_opt.value();
+        // Set scroll callback
+        fres.get().set_scroll_callback([msg = dpp::message(), channel_id = id] (float progress) {
+            std::cout << "WARNING: " << channel_id << " is scrolling! " << progress << "% \r" << std::flush;
+            return true;
+        });
+        // Return inference
+        return fres;
     }
 
     // Must run in llama thread
@@ -239,6 +250,12 @@ private:
             texts.timeout = llm_translate_from_en(texts.timeout);
             texts.translated = true;
         }
+        // Set scroll callback
+        auto scroll_cb = [] (float) {
+            std::cerr << "Error: Prompt doesn't fit into max. context size!" << std::endl;
+            abort();
+            return false;
+        };
         // Build init caches
         std::string filename;
         for (const auto& [model_name, model_config] : model_configs) {
@@ -266,6 +283,7 @@ private:
                 // Append
                 using namespace fmt::literals;
                 if (prompt.back() != '\n') prompt.push_back('\n');
+                llm->set_scroll_callback(scroll_cb);
                 llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username), show_console_progress);
                 // Serialize end result
                 std::ofstream f(filename, std::ios::binary);
@@ -294,6 +312,7 @@ private:
                 // Append
                 using namespace fmt::literals;
                 if (prompt.back() != '\n') prompt.push_back('\n');
+                llm->set_scroll_callback(scroll_cb);
                 llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username)+"\n\n"+model_config.user_prompt, show_console_progress);
                 // Serialize end result
                 std::ofstream f(filename, std::ios::binary);
@@ -671,6 +690,8 @@ int main(int argc, char **argv) {
             cfg.pool_size = std::stoi(value);
         } else if (key == "threads") {
             cfg.threads = std::stoi(value);
+        } else if (key == "scroll_keep") {
+            cfg.scroll_keep = std::stoi(value);
         } else if (key == "shard_cout") {
             cfg.shard_cout = std::stoi(value);
         } else if (key == "shard_id") {
@@ -788,6 +809,10 @@ int main(int argc, char **argv) {
             std::cerr << "Error: Default model must not have instruct mode forced if not threads only" << std::endl;
             exit(-7);
         }
+    }
+    if (cfg.scroll_keep >= 99) {
+        std::cerr << "Error: Scroll_keep must be a non-float percentage and in a range of 0-99." << std::endl;
+        exit(-12);
     }
 
     // Construct and configure bot
