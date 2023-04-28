@@ -68,6 +68,8 @@ class Bot {
     std::thread::id llm_tid;
     sqlite::database db;
 
+    std::unordered_map<dpp::snowflake, dpp::slashcommand_t> command_completion_buffer;
+
     std::string_view language;
     dpp::cluster bot;
 
@@ -445,6 +447,61 @@ private:
         return (id % config.shard_count) == config.shard_id;
     }
 
+    void command_completion_handler(dpp::slashcommand_t&& event, dpp::channel *thread = nullptr) {
+        // Stop if this is not the correct shard for thread creation
+        if (thread == nullptr) {
+            // But register this command first
+            command_completion_buffer.emplace(event.command.id, std::move(event));
+            // And then actually stop
+            if (!on_own_shard(event.command.channel_id)) return;
+        }
+        // Get model by name
+        auto res = model_configs.find(event.command.get_command_name());
+        if (res == model_configs.end()) {
+            // Model does not exit, delete corresponding command
+            bot.global_command_delete(event.command.get_command_interaction().id);
+            return;
+        }
+        const auto& [model_name, model_config] = *res;
+        // Get weather to enable instruct mode
+        bool instruct_mode;
+        const auto& instruct_mode_param = event.get_parameter("instruct_mode");
+        if (model_config.instruct_mode_policy == ModelConfig::InstructModePolicy::Allow) {
+            if (instruct_mode_param.index()) {
+                instruct_mode = std::get<bool>(instruct_mode_param);
+            } else {
+                instruct_mode = true;
+            }
+        } else {
+            instruct_mode = model_config.instruct_mode_policy == ModelConfig::InstructModePolicy::Force;
+        }
+        // Create thread if it doesn't exist or update it if it does
+        if (thread == nullptr) {
+            std::cout << "Send" << std::endl;
+            bot.thread_create(std::to_string(event.command.id), event.command.channel_id, 1440, dpp::CHANNEL_PUBLIC_THREAD, true, 15,
+                              [this, event, instruct_mode, model_name = res->first] (const dpp::confirmation_callback_t& ccb) {
+                // Check for error
+                if (ccb.is_error()) {
+                    std::cout << "Thread creation failed: " << ccb.get_error().message << std::endl;
+                    event.reply(dpp::message(texts.thread_create_fail).set_flags(dpp::message_flags::m_ephemeral));
+                    return;
+                }
+                // Report success
+                event.reply(dpp::message("Okay!").set_flags(dpp::message_flags::m_ephemeral));
+            });
+        } else {
+            // Add thread to database
+            db << "INSERT INTO threads (id, model, instruct_mode) VALUES (?, ?, ?);"
+               << std::to_string(thread->id) << model_name << instruct_mode;
+            // Stop if this is not the correct shard for thread finalization
+            if (!on_own_shard(thread->id)) return;
+            // Set name
+            std::cout << "Receive" << std::endl;
+            thread->name = "Chat with "+model_name+" "+(instruct_mode?"(Instruct mode)":"");
+            bot.channel_edit(*thread);
+        }
+    }
+
 public:
     Bot(decltype(config) cfg, decltype(model_configs) model_configs)
                 : config(cfg), model_configs(model_configs), bot(cfg.token),
@@ -474,7 +531,7 @@ public:
 
         // Configure bot
         bot.on_log(dpp::utility::cout_logger());
-        bot.intents = dpp::i_guild_messages | dpp::i_message_content;
+        bot.intents = dpp::i_guild_messages | dpp::i_message_content | dpp::i_message_content;
 
         // Set callbacks
         bot.on_ready([=, this] (const dpp::ready_t&) { //TODO: Consider removal
@@ -499,45 +556,34 @@ public:
                 thread_pool.submit(std::bind(&Bot::llm_init, this));
             }
         });
-        bot.on_slashcommand([=, this](const dpp::slashcommand_t& event) {
-            // Get model by name
-            auto res = model_configs.find(event.command.get_command_name());
-            if (res == model_configs.end()) {
-                // Model does not exit, delete corresponding command
-                bot.global_command_delete(event.command.id);
-                return;
-            }
-            const auto& [model_name, model_config] = *res;
-            // Get weather to enable instruct mode
-            bool instruct_mode;
-            const auto& instruct_mode_param = event.get_parameter("instruct_mode");
-            if (model_config.instruct_mode_policy == ModelConfig::InstructModePolicy::Allow) {
-                if (instruct_mode_param.index()) {
-                    instruct_mode = std::get<bool>(instruct_mode_param);
-                } else {
-                    instruct_mode = true;
-                }
-            } else {
-                instruct_mode = model_config.instruct_mode_policy == ModelConfig::InstructModePolicy::Force;
-            }
-            // Stop if this isn't our shard
-            if (!on_own_shard(event.command.channel_id)) return;
-            // Create thread
-            bot.thread_create("Chat with "+model_name, event.command.channel_id, 1440, dpp::CHANNEL_PUBLIC_THREAD, true, 15,
-                              [this, event, instruct_mode, model_name = res->first] (const dpp::confirmation_callback_t& ccb) {
-                // Check for error
-                if (ccb.is_error()) {
-                    std::cout << "Thread creation failed: " << ccb.get_error().message << std::endl;
-                    event.reply(dpp::message(texts.thread_create_fail).set_flags(dpp::message_flags::m_ephemeral));
+        bot.on_slashcommand([=, this](dpp::slashcommand_t event) {
+            command_completion_handler(std::move(event));
+        });
+        bot.on_message_create([=, this](const dpp::message_create_t& event) {
+            // Check that this is for thread creation
+            if (event.msg.type != dpp::mt_thread_created) return;
+            // Get thread that was created
+            bot.channel_get(event.msg.id, [this] (const dpp::confirmation_callback_t& ccb) {
+                // Stop on error
+                if (ccb.is_error()) return;
+                // Get thread
+                auto thread = ccb.get<dpp::channel>();
+                // Attempt to get command ID
+                dpp::snowflake command_id;
+                try {
+                    command_id = thread.name;
+                } catch (...) {
                     return;
                 }
-                // Get thread
-                const auto& thread = ccb.get<dpp::thread>();
-                // Add thread to database
-                db << "INSERT INTO threads (id, model, instruct_mode) VALUES (?, ?, ?);"
-                   << std::to_string(thread.id) << model_name << instruct_mode;
-                // Report success
-                event.reply(dpp::message("Okay!").set_flags(dpp::message_flags::m_ephemeral));
+                // Find command
+                auto res = command_completion_buffer.find(command_id);
+                if (res == command_completion_buffer.end()) {
+                    return;
+                }
+                // Complete command
+                command_completion_handler(std::move(res->second), &thread);
+                // Remove command from buffer
+                command_completion_buffer.erase(res);
             });
         });
         bot.on_message_create([=, this] (const dpp::message_create_t& event) {
