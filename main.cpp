@@ -60,7 +60,6 @@ void clean_for_command_name(std::string& value) {
 
 class Bot {
     ThreadPool thread_pool{1};
-    Timer last_message_timer;
     std::shared_ptr<bool> stopping;
     LM::InferencePool llm_pool;
     std::unique_ptr<Translator> translator;
@@ -109,8 +108,10 @@ public:
                  pool_size = 2,
                  timeout = 120,
                  threads = 4,
-                 persistance = true;
-        bool mlock = false,
+                 shard_cout = 1,
+                 shard_id = 0;
+        bool persistance = true,
+             mlock = false,
              live_edit = false,
              threads_only = true;
         const ModelConfig *default_inference_model_cfg = nullptr,
@@ -519,15 +520,15 @@ public:
             users[event.msg.author.id] = event.msg.author;
             // Make sure message has content
             if (event.msg.content.empty()) return;
-            // Reset last message timer
-            last_message_timer.reset();
+            // Ignore messges from channel on another shard
+            if ((uint64_t(event.msg.channel_id) % config.shard_cout) != config.shard_id) return;
             // Ignore own messages
             if (event.msg.author.id == bot.me.id) {
                 // Add message to list of own messages
                 my_messages.push_back(event.msg.id);
                 return;
             }
-            // Move on in another thread
+            // Process message
             try {
                 dpp::message msg = event.msg;
                 // Check for reset command
@@ -670,6 +671,10 @@ int main(int argc, char **argv) {
             cfg.pool_size = std::stoi(value);
         } else if (key == "threads") {
             cfg.threads = std::stoi(value);
+        } else if (key == "shard_cout") {
+            cfg.shard_cout = std::stoi(value);
+        } else if (key == "shard_id") {
+            cfg.shard_id = std::stoi(value);
         } else if (key == "timeout") {
             cfg.timeout = std::stoi(value);
         } else if (key == "ctx_size") {

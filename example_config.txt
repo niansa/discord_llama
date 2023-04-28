@@ -12,6 +12,9 @@ translation_model none
 prompt_file none
 instruct_prompt_file none
 
+shard_count 1
+shard_id 0
+
 persistance true
 mlock false
 pool_size 2
