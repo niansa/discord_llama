@@ -109,7 +109,7 @@ public:
                  timeout = 120,
                  threads = 4,
                  scroll_keep = 20,
-                 shard_cout = 1,
+                 shard_count = 1,
                  shard_id = 0;
         bool persistance = true,
              mlock = false,
@@ -540,7 +540,7 @@ public:
             // Make sure message has content
             if (event.msg.content.empty()) return;
             // Ignore messges from channel on another shard
-            if ((uint64_t(event.msg.channel_id) % config.shard_cout) != config.shard_id) return;
+            if ((uint64_t(event.msg.channel_id) % config.shard_count) != config.shard_id) return;
             // Ignore own messages
             if (event.msg.author.id == bot.me.id) {
                 // Add message to list of own messages
@@ -692,8 +692,8 @@ int main(int argc, char **argv) {
             cfg.threads = std::stoi(value);
         } else if (key == "scroll_keep") {
             cfg.scroll_keep = std::stoi(value);
-        } else if (key == "shard_cout") {
-            cfg.shard_cout = std::stoi(value);
+        } else if (key == "shard_count") {
+            cfg.shard_count = std::stoi(value);
         } else if (key == "shard_id") {
             cfg.shard_id = std::stoi(value);
         } else if (key == "timeout") {
