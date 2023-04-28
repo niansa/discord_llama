@@ -441,6 +441,10 @@ private:
         });
     }
 
+    bool on_own_shard(uint64_t id) const {
+        return (id % config.shard_count) == config.shard_id;
+    }
+
 public:
     Bot(decltype(config) cfg, decltype(model_configs) model_configs)
                 : config(cfg), model_configs(model_configs), bot(cfg.token),
@@ -516,6 +520,8 @@ public:
             } else {
                 instruct_mode = model_config.instruct_mode_policy == ModelConfig::InstructModePolicy::Force;
             }
+            // Stop if this isn't our shard
+            if (!on_own_shard(event.command.channel_id)) return;
             // Create thread
             bot.thread_create("Chat with "+model_name, event.command.channel_id, 1440, dpp::CHANNEL_PUBLIC_THREAD, true, 15,
                               [this, event, instruct_mode, model_name = res->first] (const dpp::confirmation_callback_t& ccb) {
@@ -540,7 +546,7 @@ public:
             // Make sure message has content
             if (event.msg.content.empty()) return;
             // Ignore messges from channel on another shard
-            if ((uint64_t(event.msg.channel_id) % config.shard_count) != config.shard_id) return;
+            if (!on_own_shard(event.msg.channel_id)) return;
             // Ignore own messages
             if (event.msg.author.id == bot.me.id) {
                 // Add message to list of own messages
