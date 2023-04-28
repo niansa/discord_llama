@@ -444,7 +444,7 @@ private:
     }
 
     bool on_own_shard(uint64_t id) const {
-        return (id % config.shard_count) == config.shard_id;
+        return ((id/10) % config.shard_count) == config.shard_id;
     }
 
     void command_completion_handler(dpp::slashcommand_t&& event, dpp::channel *thread = nullptr) {
