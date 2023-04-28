@@ -501,7 +501,9 @@ private:
             if (!on_own_shard(thread->id)) return;
             // Set name
             std::cout << "Responsible for finalizing thread: " << thread->id << std::endl;
-            thread->name = "Chat with "+model_name+" "+(instruct_mode?"(Instruct mode)":"");
+            thread->name = "Chat with "+model_name+" " // Model name
+                    +(instruct_mode?"":"(Non Instruct mode) ") // Instruct mode
+                    +'#'+(config.shard_count!=1?std::to_string(config.shard_id):""); // Shard ID
             bot.channel_edit(*thread);
         }
     }
@@ -870,6 +872,14 @@ int main(int argc, char **argv) {
     if (cfg.scroll_keep >= 99) {
         std::cerr << "Error: Scroll_keep must be a non-float percentage and in a range of 0-99." << std::endl;
         exit(-12);
+    }
+    if (cfg.shard_count == 0) {
+        std::cerr << "Error: Shard count must be above zero." << std::endl;
+        exit(-13);
+    }
+    if (cfg.shard_id >= cfg.shard_count) {
+        std::cerr << "Error: Not enough shards for this ID to exist." << std::endl;
+        exit(-13);
     }
 
     // Construct and configure bot
