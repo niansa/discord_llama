@@ -477,7 +477,6 @@ private:
         }
         // Create thread if it doesn't exist or update it if it does
         if (thread == nullptr) {
-            std::cout << "Responsible for creating thread: " << thread->id << std::endl;
             bot.thread_create(std::to_string(event.command.id), event.command.channel_id, 1440, dpp::CHANNEL_PUBLIC_THREAD, true, 15,
                               [this, event, instruct_mode, model_name = res->first] (const dpp::confirmation_callback_t& ccb) {
                 // Check for error
@@ -486,6 +485,7 @@ private:
                     event.reply(dpp::message(texts.thread_create_fail).set_flags(dpp::message_flags::m_ephemeral));
                     return;
                 }
+                std::cout << "Responsible for creating thread: " << ccb.get<dpp::thread>().id << std::endl;
                 // Report success
                 event.reply(dpp::message("Okay!").set_flags(dpp::message_flags::m_ephemeral));
             });
