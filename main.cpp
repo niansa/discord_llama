@@ -28,7 +28,6 @@
 
 class Bot {
     ThreadPool thread_pool{1};
-    std::shared_ptr<bool> stopping;
     LM::InferencePool llm_pool;
     std::unique_ptr<Translator> translator;
     std::vector<dpp::snowflake> my_messages;
@@ -44,7 +43,9 @@ class Bot {
 
     dpp::cluster bot;
 
-public:
+    struct ExitRequest {};
+
+public:    
     struct ModelConfig {
         std::string weight_path,
                     user_prompt,
@@ -694,9 +695,16 @@ public:
     }
 
     void start() {
-        stopping = std::make_shared<bool>(false);
-        bot.start(dpp::st_wait);
-        *stopping = true;
+        try {
+            bot.start(dpp::st_wait);
+        } catch (ExitRequest) {}
+    }
+    void stop() {
+        thread_pool.submit([this] () {
+            llm_pool.store_all();
+        }).wait();
+        thread_pool.shutdown();
+        throw ExitRequest();
     }
 };
 
@@ -902,6 +910,20 @@ int main(int argc, char **argv) {
 
     // Construct and configure bot
     Bot bot(cfg, models);
+
+    // Set signal handlers on Linux
+#   ifdef sa_sigaction
+    struct sigaction sigact;
+    static Bot& bot_st = bot;
+    sigact.sa_handler = [] (int) {
+        bot_st.stop();
+    };
+    sigemptyset(&sigact.sa_mask);
+    sigact.sa_flags = 0;
+    sigaction(SIGTERM, &sigact, nullptr);
+    sigaction(SIGINT, &sigact, nullptr);
+    sigaction(SIGHUP, &sigact, nullptr);
+#   endif
 
     // Start bot
     bot.start();
