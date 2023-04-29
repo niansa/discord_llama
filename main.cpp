@@ -69,6 +69,13 @@ public:
         const ModelConfig *model_config;
         bool instruct_mode = false;
     };
+    struct Texts {
+        std::string please_wait = "Please wait...",
+                    thread_create_fail = "Error: I couldn't create a thread here. Do I have enough permissions?",
+                    model_missing = "Error: The model that was used in this thread could no longer be found.",
+                    timeout = "Error: Timeout";
+        bool translated = false;
+    };
     struct Configuration {
         std::string token,
                     language = "EN",
@@ -76,7 +83,8 @@ public:
                     translation_model = "none",
                     prompt_file = "none",
                     instruct_prompt_file = "none",
-                    models_dir = "models";
+                    models_dir = "models",
+                    texts_file = "none";
         unsigned ctx_size = 1012,
                  pool_size = 2,
                  timeout = 120,
@@ -97,13 +105,7 @@ private:
     const Configuration& config;
     const std::unordered_map<std::string, ModelConfig>& model_configs;
 
-    struct Texts {
-        std::string please_wait = "Please wait...",
-                    thread_create_fail = "Error: I couldn't create a thread here. Do I have enough permissions?",
-                    model_missing = "Error: The model that was used in this thread could no longer be found.",
-                    timeout = "Error: Timeout";
-        bool translated = false;
-    } texts;
+    Texts texts;
 
     inline static
     bool show_console_progress(float progress) {
@@ -787,6 +789,8 @@ int main(int argc, char **argv) {
             cfg.instruct_prompt_file = std::move(value);
         } else if (key == "models_dir") {
             cfg.models_dir = std::move(value);
+        } else if (key == "texts_file") {
+            cfg.texts_file = std::move(value);
         } else if (key == "pool_size") {
             cfg.pool_size = std::stoi(value);
         } else if (key == "threads") {
@@ -814,6 +818,38 @@ int main(int argc, char **argv) {
         } else if (!key.empty() && key[0] != '#') {
             std::cerr << "Error: Failed to parse configuration file: Unknown key: " << key << std::endl;
             exit(-3);
+        }
+    }
+
+    // Parse texts_file
+    Bot::Texts texts;
+    if (cfg.texts_file != "none") {
+        std::ifstream textsf(cfg.texts_file);
+        if (!textsf) {
+            std::cerr << "Error: Failed to open texts file: " << cfg.texts_file << std::endl;
+            exit(-1);
+        }
+        for (std::string key; textsf >> key;) {
+            // Read value
+            std::string value;
+            std::getline(textsf, value);
+            // Erase all leading spaces
+            while (!value.empty() && (value[0] == ' ' || value[0] == '\t')) value.erase(0, 1);
+            // Check key and ignore comment lines
+            if (key == "model_missing") {
+                texts.model_missing = std::move(value);
+            } else if (key == "please_wait") {
+                texts.please_wait = std::move(value);
+            } else if (key == "thread_create_fail") {
+                texts.thread_create_fail = std::move(value);
+            } else if (key == "timeout") {
+                texts.timeout = std::move(value);
+            } else if (key == "translated") {
+                texts.translated = parse_bool(value);
+            } else if (!key.empty() && key[0] != '#') {
+                std::cerr << "Error: Failed to parse texts file: Unknown key: " << key << std::endl;
+                exit(-3);
+            }
         }
     }
 
@@ -929,7 +965,7 @@ int main(int argc, char **argv) {
     // Construct and configure bot
     Bot bot(cfg, models);
 
-    // Set signal handlers on Linux
+    // Set signal handlers if available
 #   ifdef sa_sigaction
     struct sigaction sigact;
     static Bot& bot_st = bot;

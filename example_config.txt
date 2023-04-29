@@ -2,6 +2,7 @@ token MTA0MDYxMTQzNjUwNzk1OTMyNw.Gl_iMU.jVVM3bRqBJVi8ORVpWHquOivlASGJpRySt8qFg
 
 # The following parameters are set to their defaults here and can be ommited
 models_dir models
+texts_file none
 language EN
 threads_only true
 live_edit false

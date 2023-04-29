@@ -1,0 +1,7 @@
+# The following parameters are set to their defaults here and can be ommited
+please_wait Please wait...
+thread_create_fail Error: I couldn't create a thread here. Do I have enough permissions?
+model_missing Error: The model that was used in this thread could no longer be found.
+timeout Error: Timeout
+
+translated false

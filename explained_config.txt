@@ -5,6 +5,9 @@ token MTA0MDYxMTQzNjUwNzk1OTMyNw.Gl_iMU.jVVM3bRqBJVi8ORVpWHquOivlASGJpRySt8qFg
 # Directory the models are located in. For example, see example_models/
 models_dir models
 
+# File containing status texts. For example, see example_texts.txt
+texts_file none
+
 # Language everything is translated to (will be disabled if set to "EN" anyways)
 language EN
 
