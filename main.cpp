@@ -104,8 +104,7 @@ public:
 private:
     const Configuration& config;
     const std::unordered_map<std::string, ModelConfig>& model_configs;
-
-    Texts texts;
+    Texts& texts;
 
     inline static
     bool show_console_progress(float progress) {
@@ -530,8 +529,8 @@ private:
     }
 
 public:
-    Bot(decltype(config) cfg, decltype(model_configs) model_configs)
-                : config(cfg), model_configs(model_configs),
+    Bot(decltype(config) cfg, decltype(model_configs) model_configs, decltype(texts) texts)
+                : config(cfg), model_configs(model_configs), texts(texts),
                   bot(cfg.token), db("database.sqlite3"),
                   llm_pool(cfg.pool_size, "discord_llama", !cfg.persistance) {
         // Initialize database
@@ -963,7 +962,7 @@ int main(int argc, char **argv) {
     }
 
     // Construct and configure bot
-    Bot bot(cfg, models);
+    Bot bot(cfg, models, texts);
 
     // Set signal handlers if available
 #   ifdef sa_sigaction
