@@ -5,6 +5,7 @@ project(discord_llama LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+add_subdirectory(libjustlm)
 add_subdirectory(anyproc)
 add_subdirectory(DPP)
 add_subdirectory(thread-pool)
