@@ -915,8 +915,11 @@ int main(int argc, char **argv) {
 #   ifdef sa_sigaction
     struct sigaction sigact;
     static Bot& bot_st = bot;
+    static const auto main_thread = std::this_thread::get_id();
     sigact.sa_handler = [] (int) {
-        bot_st.stop();
+        if (std::this_thread::get_id() == main_thread) {
+            bot_st.stop();
+        }
     };
     sigemptyset(&sigact.sa_mask);
     sigact.sa_flags = 0;
