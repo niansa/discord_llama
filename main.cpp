@@ -458,21 +458,21 @@ private:
 
     // This function is responsible for sharding thread creation
     // A bit ugly but a nice way to avoid having to communicate over any other means than just the Discord API
-    void command_completion_handler(dpp::slashcommand_t&& event, dpp::channel *thread = nullptr) {
+    bool command_completion_handler(dpp::slashcommand_t&& event, dpp::channel *thread = nullptr) {
         // Stop if this is not the correct shard for thread creation
         if (thread == nullptr) {
             // But register this command first
             std::scoped_lock L(command_completion_buffer_mutex);
             command_completion_buffer.emplace(event.command.id, std::move(event));
             // And then actually stop
-            if (!on_own_shard(event.command.channel_id)) return;
+            if (!on_own_shard(event.command.channel_id)) return false;
         }
         // Get model by name
         auto res = model_configs.find(event.command.get_command_name());
         if (res == model_configs.end()) {
             // Model does not exit, delete corresponding command
             bot.global_command_delete(event.command.get_command_interaction().id);
-            return;
+            return false;
         }
         const auto& [model_name, model_config] = *res;
         // Get weather to enable instruct mode
@@ -504,7 +504,7 @@ private:
             db << "INSERT INTO threads (id, model, instruct_mode) VALUES (?, ?, ?);"
                << std::to_string(thread->id) << model_name << instruct_mode;
             // Stop if this is not the correct shard for thread finalization
-            if (!on_own_shard(thread->id)) return;
+            if (!on_own_shard(thread->id)) return false;
             // Set name
             std::cout << "Responsible for finalizing thread: " << thread->id << std::endl;
             thread->name = create_thread_name(model_name, instruct_mode);
@@ -524,6 +524,7 @@ private:
                 thread_embeds[thread_id] = msg;
             });
         }
+        return true;
     }
 
 public:
@@ -606,11 +607,11 @@ public:
                     return;
                 }
                 // Complete command
-                command_completion_handler(std::move(res->second), &thread);
+                auto handled = command_completion_handler(std::move(res->second), &thread);
                 // Remove command from buffer
                 command_completion_buffer.erase(res);
-                // Delete this message
-                bot.message_delete(msg_id, channel_id);
+                // Delete this message if we handled it
+                if (handled) bot.message_delete(msg_id, channel_id);
             });
         });
         bot.on_message_create([=, this] (const dpp::message_create_t& event) {
