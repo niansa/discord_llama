@@ -43,8 +43,6 @@ class Bot {
 
     dpp::cluster bot;
 
-    struct ExitRequest {};
-
 public:    
     struct ModelConfig {
         std::string weight_path,
@@ -695,16 +693,13 @@ public:
     }
 
     void start() {
-        try {
-            bot.start(dpp::st_wait);
-        } catch (ExitRequest) {}
+        bot.start(dpp::st_wait);
     }
-    void stop() {
+    void stop_prepare() {
         thread_pool.submit([this] () {
             llm_pool.store_all();
         }).wait();
         thread_pool.shutdown();
-        throw ExitRequest();
     }
 };
 
@@ -918,7 +913,8 @@ int main(int argc, char **argv) {
     static const auto main_thread = std::this_thread::get_id();
     sigact.sa_handler = [] (int) {
         if (std::this_thread::get_id() == main_thread) {
-            bot_st.stop();
+            bot_st.stop_prepare();
+            exit(0);
         }
     };
     sigemptyset(&sigact.sa_mask);
