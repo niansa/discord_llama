@@ -434,7 +434,7 @@ private:
             if (shorted.size() != first_message.size()) {
                 shorted += "...";
             }
-            embed.description += "\n\n"+shorted;
+            embed.description += "\n\n> "+shorted;
         }
         // Return final result
         return embed;
