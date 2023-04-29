@@ -49,6 +49,6 @@ std::string_view max_words(std::string_view text, unsigned count) {
         }
     }
     // Return resulting string
-    return {text.data(), text.size()-idx};
+    return {text.data(), idx};
 }
 }
