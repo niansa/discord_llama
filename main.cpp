@@ -423,7 +423,7 @@ private:
         dpp::embed embed;
         // Create embed
         embed.set_title(create_thread_name(model_name, instruct_mode))
-             .set_description("[Open the chat](https://discord.com/channels/"+std::to_string(guild_id)+'/'+std::to_string(thread_id+')'))
+             .set_description("[Open the chat](https://discord.com/channels/"+std::to_string(guild_id)+'/'+std::to_string(thread_id)+')')
              .set_footer(dpp::embed_footer().set_text("Started by "+author.format_username()))
              .set_color(utils::get_unique_color(model_name));
         // Add first message if any
@@ -677,10 +677,9 @@ public:
                     return;
                 }
                 // Update that embed
-                const auto embed = create_chat_embed(msg.guild_id, msg.channel_id, *channel_cfg.model_name, channel_cfg.instruct_mode, msg.author, msg.content);
                 dpp::message embed_msg;
                 embed_msg.id = res->second;
-                embed_msg.add_embed(embed);
+                embed_msg.add_embed(create_chat_embed(msg.guild_id, msg.channel_id, *channel_cfg.model_name, channel_cfg.instruct_mode, msg.author, msg.content));
                 bot.message_edit(embed_msg);
             } catch (const std::exception& e) {
                 std::cerr << "Warning: " << e.what() << std::endl;
