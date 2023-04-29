@@ -11,7 +11,7 @@ add_subdirectory(DPP)
 add_subdirectory(thread-pool)
 add_subdirectory(fmt)
 
-add_executable(discord_llama main.cpp)
+add_executable(discord_llama main.cpp utils.cpp utils.hpp)
 target_link_libraries(discord_llama PUBLIC dpp fmt pthread libjustlm anyproc ggml threadpool sqlite3)
 
 install(TARGETS discord_llama
