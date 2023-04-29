@@ -328,10 +328,6 @@ private:
     // Must run in llama thread
     void prompt_add_msg(const dpp::message& msg, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
-        // Make sure message isn't too long
-        if (msg.content.size() > 512) {
-            return;
-        }
         // Get inference
         auto& inference = llm_get_inference(msg.channel_id, channel_cfg);
         std::string prefix;
