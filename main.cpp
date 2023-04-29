@@ -420,7 +420,7 @@ private:
                 +'#'+(config.shard_count!=1?std::to_string(config.shard_id):""); // Shard ID
     }
 
-    dpp::embed create_chat_embed(dpp::snowflake guild_id, dpp::snowflake thread_id, const std::string& model_name, bool instruct_mode, const dpp::user& author, const std::string& first_message = "") const {
+    dpp::embed create_chat_embed(dpp::snowflake guild_id, dpp::snowflake thread_id, const std::string& model_name, bool instruct_mode, const dpp::user& author, std::string_view first_message = "") const {
         dpp::embed embed;
         // Create embed
         embed.set_title(create_thread_name(model_name, instruct_mode))
@@ -434,7 +434,7 @@ private:
             if (shorted.size() != first_message.size()) {
                 shorted += "...";
             }
-            embed.add_field("⠀", shorted);
+            embed.description += "\n\n"+shorted;
         }
         // Return final result
         return embed;

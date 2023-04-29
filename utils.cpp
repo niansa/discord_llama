@@ -39,7 +39,7 @@ std::string_view max_words(std::string_view text, unsigned count) {
     // Get idx after last word
     for (idx = 0; idx != text.size() && word_count != count; idx++) {
         char c = text[idx];
-        if (c == ' ' || word_len == 7) {
+        if (c == ' ' || word_len == 8) {
             if (word_len != 0) {
                 word_count++;
                 word_len = 0;
@@ -49,6 +49,6 @@ std::string_view max_words(std::string_view text, unsigned count) {
         }
     }
     // Return resulting string
-    return {text.data()+idx, text.size()-idx};
+    return {text.data(), text.size()-idx};
 }
 }
