@@ -402,7 +402,7 @@ private:
             // Handle timeout
             if (timeout_exceeded) {
                 if (config.live_edit) {
-                    output += "...";
+                    output += "...\n"+texts.timeout;
                 } else {
                     output = texts.timeout;
                 }
