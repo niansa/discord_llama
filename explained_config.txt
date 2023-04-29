@@ -50,5 +50,8 @@ timeout 120
 # Max. context size
 ctx_size 1012
 
+# Max. context age in seconds; 0 to disable
+max_context_age 0
+
 # Percentage of context below prompt to be kept when scrolling. 0 means no context will be kept when scolling (not recommended!!!)
 scroll_keep 20

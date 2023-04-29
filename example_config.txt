@@ -21,4 +21,5 @@ pool_size 2
 threads 4
 timeout 120
 ctx_size 1012
+max_context_age 0
 scroll_keep 20

@@ -33,6 +33,7 @@ class Bot {
     std::vector<dpp::snowflake> my_messages;
     std::unordered_map<dpp::snowflake, dpp::user> users;
     std::thread::id llm_tid;
+    utils::Timer cleanup_timer;
     sqlite::database db;
 
     std::mutex command_completion_buffer_mutex;
@@ -82,7 +83,8 @@ public:
                  threads = 4,
                  scroll_keep = 20,
                  shard_count = 1,
-                 shard_id = 0;
+                 shard_id = 0,
+                 max_context_age = 0;
         bool persistance = true,
              mlock = false,
              live_edit = false,
@@ -415,6 +417,19 @@ private:
         return (unsigned(id.get_creation_time()) % config.shard_count) == config.shard_id;
     }
 
+    void cleanup() {
+        // Clean up InferencePool
+        llm_pool.cleanup(config.max_context_age);
+        // Reset timer
+        cleanup_timer.reset();
+    }
+    void attempt_cleanup() {
+        // Run cleanup if enough time has passed
+        if (cleanup_timer.get<std::chrono::seconds>() > config.max_context_age / 4) {
+            cleanup();
+        }
+    }
+
     std::string create_thread_name(const std::string& model_name, bool instruct_mode) const {
         return "Chat with "+model_name+" " // Model name
                 +(instruct_mode?"":"(Non Instruct mode) ") // Instruct mode
@@ -693,6 +708,7 @@ public:
     }
 
     void start() {
+        cleanup();
         bot.start(dpp::st_wait);
     }
     void stop_prepare() {
@@ -780,6 +796,8 @@ int main(int argc, char **argv) {
             cfg.timeout = std::stoi(value);
         } else if (key == "ctx_size") {
             cfg.ctx_size = std::stoi(value);
+        } else if (key == "max_context_age") {
+            cfg.max_context_age = std::stoi(value);
         } else if (key == "mlock") {
             cfg.mlock = parse_bool(value);
         } else if (key == "live_edit") {
