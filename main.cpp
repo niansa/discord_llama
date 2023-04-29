@@ -584,6 +584,10 @@ public:
         bot.on_slashcommand([=, this](dpp::slashcommand_t event) {
             command_completion_handler(std::move(event));
         });
+        bot.on_message_create([=, this](...) {
+            // Attempt cleanup
+            attempt_cleanup();
+        });
         bot.on_message_create([=, this](const dpp::message_create_t& event) {
             // Check that this is for thread creation
             if (event.msg.type != dpp::mt_thread_created) return;
