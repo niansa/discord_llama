@@ -16,6 +16,7 @@
 #include <sstream>
 #include <mutex>
 #include <memory>
+#include <utility>
 #include <dpp/dpp.h>
 #include <fmt/format.h>
 #include <justlm.hpp>
@@ -39,7 +40,7 @@ class Bot {
     std::unordered_map<dpp::snowflake, dpp::slashcommand_t> command_completion_buffer;
 
     std::mutex thread_embeds_mutex;
-    std::unordered_map<dpp::snowflake, dpp::snowflake> thread_embeds;
+    std::unordered_map<dpp::snowflake, dpp::message> thread_embeds;
 
     dpp::cluster bot;
 
@@ -501,8 +502,10 @@ private:
                     std::cerr << "Warning: Failed to create embed: " << ccb.get_error().message << std::endl;
                     return;
                 }
+                // Get message
+                const auto& msg = ccb.get<dpp::message>();
                 // Add to embed list
-                thread_embeds[thread_id] = ccb.get<dpp::message>().id;
+                thread_embeds[thread_id] = msg;
             });
         }
     }
@@ -677,10 +680,11 @@ public:
                     return;
                 }
                 // Update that embed
-                dpp::message embed_msg;
-                embed_msg.id = res->second;
-                embed_msg.add_embed(create_chat_embed(msg.guild_id, msg.channel_id, *channel_cfg.model_name, channel_cfg.instruct_mode, msg.author, msg.content));
+                auto embed_msg = res->second;
+                embed_msg.embeds[0] = create_chat_embed(msg.guild_id, msg.channel_id, *channel_cfg.model_name, channel_cfg.instruct_mode, msg.author, msg.content);
                 bot.message_edit(embed_msg);
+                // Remove thread embed linkage from vector
+                thread_embeds.erase(res);
             } catch (const std::exception& e) {
                 std::cerr << "Warning: " << e.what() << std::endl;
             }
