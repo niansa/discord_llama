@@ -358,7 +358,9 @@ private:
                 if (config.live_edit) {
                     msg.content += token;
                     if (edit_timer.get<std::chrono::seconds>() > 3) {
-                        bot.message_edit(msg);
+                        try {
+                            bot.message_edit(msg);
+                        } catch (...) {}
                         edit_timer.reset();
                     }
                 }
