@@ -1,4 +1,5 @@
 #include "utils.hpp"
+#include "config.hpp"
 #include "sqlite_modern_cpp/sqlite_modern_cpp.h"
 
 #include <string>
@@ -45,66 +46,14 @@ class Bot {
     dpp::cluster bot;
 
 public:    
-    struct ModelConfig {
-        std::string weight_path,
-                    user_prompt,
-                    bot_prompt;
-        bool emits_eos = false,
-             no_translate = false;
-        enum class InstructModePolicy {
-            Allow = 0b11,
-            Force = 0b10,
-            Forbid = 0b01
-        } instruct_mode_policy = InstructModePolicy::Allow;
-
-        bool is_instruct_mode_allowed() const {
-            return static_cast<unsigned>(instruct_mode_policy) & 0b10;
-        }
-        bool is_non_instruct_mode_allowed() const {
-            return static_cast<unsigned>(instruct_mode_policy) & 0b01;
-        }
-    };
     struct BotChannelConfig {
         const std::string *model_name;
-        const ModelConfig *model_config;
+        const Configuration::Model *model;
         bool instruct_mode = false;
-    };
-    struct Texts {
-        std::string please_wait = "Please wait...",
-                    thread_create_fail = "Error: I couldn't create a thread here. Do I have enough permissions?",
-                    model_missing = "Error: The model that was used in this thread could no longer be found.",
-                    timeout = "Error: Timeout";
-        bool translated = false;
-    };
-    struct Configuration {
-        std::string token,
-                    language = "EN",
-                    default_inference_model = "13B-vanilla",
-                    translation_model = "none",
-                    prompt_file = "none",
-                    instruct_prompt_file = "none",
-                    models_dir = "models",
-                    texts_file = "none";
-        unsigned ctx_size = 1012,
-                 pool_size = 2,
-                 timeout = 120,
-                 threads = 4,
-                 scroll_keep = 20,
-                 shard_count = 1,
-                 shard_id = 0,
-                 max_context_age = 0;
-        bool persistance = true,
-             mlock = false,
-             live_edit = false,
-             threads_only = true;
-        const ModelConfig *default_inference_model_cfg = nullptr,
-                          *translation_model_cfg = nullptr;
     };
 
 private:
-    const Configuration& config;
-    const std::unordered_map<std::string, ModelConfig>& model_configs;
-    Texts& texts;
+    Configuration& config;
 
     inline static
     bool show_console_progress(float progress) {
@@ -189,7 +138,7 @@ private:
     LM::Inference &llm_start(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Get or create inference
-        auto& inference = llm_pool.create_inference(id, channel_cfg.model_config->weight_path, llm_get_params(channel_cfg.instruct_mode));
+        auto& inference = llm_pool.create_inference(id, channel_cfg.model->weight_path, llm_get_params(channel_cfg.instruct_mode));
         llm_restart(inference, channel_cfg);
         return inference;
     }
@@ -218,12 +167,12 @@ private:
         // Set LLM thread
         llm_tid = std::this_thread::get_id();
         // Translate texts
-        if (!texts.translated) {
-            texts.please_wait = llm_translate_from_en(texts.please_wait);
-            texts.model_missing = llm_translate_from_en(texts.model_missing);
-            texts.thread_create_fail = llm_translate_from_en(texts.thread_create_fail);
-            texts.timeout = llm_translate_from_en(texts.timeout);
-            texts.translated = true;
+        if (!config.texts.translated) {
+            config.texts.please_wait = llm_translate_from_en(config.texts.please_wait);
+            config.texts.model_missing = llm_translate_from_en(config.texts.model_missing);
+            config.texts.thread_create_fail = llm_translate_from_en(config.texts.thread_create_fail);
+            config.texts.timeout = llm_translate_from_en(config.texts.timeout);
+            config.texts.translated = true;
         }
         // Set scroll callback
         auto scroll_cb = [] (float) {
@@ -233,7 +182,7 @@ private:
         };
         // Build init caches
         std::string filename;
-        for (const auto& [model_name, model_config] : model_configs) {
+        for (const auto& [model_name, model_config] : config.models) {
             //TODO: Add hashes to regenerate these as needed
             // Standard prompt
             filename = model_name+"_init_cache";
@@ -317,11 +266,11 @@ private:
         // Instruct mode user prompt
         if (channel_cfg.instruct_mode) {
             // Append line as-is
-            inference.append("\n\n"+std::string(llm_translate_to_en(msg.content, channel_cfg.model_config->no_translate))+'\n', cb);
+            inference.append("\n\n"+std::string(llm_translate_to_en(msg.content, channel_cfg.model->no_translate))+'\n', cb);
         } else {
             // Format and append lines
             for (const auto line : utils::str_split(msg.content, '\n')) {
-                inference.append(msg.author.username+": "+std::string(llm_translate_to_en(line, channel_cfg.model_config->no_translate))+'\n', cb);
+                inference.append(msg.author.username+": "+std::string(llm_translate_to_en(line, channel_cfg.model->no_translate))+'\n', cb);
             }
         }
         // Append line break on timeout
@@ -331,7 +280,7 @@ private:
     void prompt_add_trigger(LM::Inference& inference, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         if (channel_cfg.instruct_mode) {
-            inference.append('\n'+channel_cfg.model_config->bot_prompt+"\n\n");
+            inference.append('\n'+channel_cfg.model->bot_prompt+"\n\n");
         } else {
             inference.append(bot.me.username+':', show_console_progress);
         }
@@ -350,7 +299,7 @@ private:
             utils::Timer edit_timer;
             bool timeout_exceeded = false;
             msg.content.clear();
-            auto output = inference.run(channel_cfg.instruct_mode?channel_cfg.model_config->user_prompt:"\n", [&] (std::string_view token) {
+            auto output = inference.run(channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n", [&] (std::string_view token) {
                 std::cout << token << std::flush;
                 if (timeout.get<std::chrono::seconds>() > config.timeout) {
                     timeout_exceeded = true;
@@ -372,18 +321,18 @@ private:
             // Handle timeout
             if (timeout_exceeded) {
                 if (config.live_edit) {
-                    output += "...\n"+texts.timeout;
+                    output += "...\n"+config.texts.timeout;
                 } else {
-                    output = texts.timeout;
+                    output = config.texts.timeout;
                 }
             }
             // Send resulting message
-            msg.content = llm_translate_from_en(output, channel_cfg.model_config->no_translate);
+            msg.content = llm_translate_from_en(output, channel_cfg.model->no_translate);
             bot.message_edit(msg);
             // Prepare for next message
             inference.append("\n");
-            if (channel_cfg.model_config->emits_eos) {
-                inference.append("\n"+channel_cfg.model_config->user_prompt);
+            if (channel_cfg.model->emits_eos) {
+                inference.append("\n"+channel_cfg.model->user_prompt);
             }
         } catch (const std::exception& e) {
             std::cerr << "Warning: " << e.what() << std::endl;
@@ -408,7 +357,7 @@ private:
     }
 
     void enqueue_reply(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
-        bot.message_create(dpp::message(id, texts.please_wait+" :thinking:"), [=, this] (const dpp::confirmation_callback_t& ccb) {
+        bot.message_create(dpp::message(id, config.texts.please_wait+" :thinking:"), [=, this] (const dpp::confirmation_callback_t& ccb) {
             if (ccb.is_error()) return;
             thread_pool.submit(std::bind(&Bot::reply, this, id, ccb.get<dpp::message>(), channel_cfg));
         });
@@ -469,8 +418,8 @@ private:
             if (!on_own_shard(event.command.channel_id)) return false;
         }
         // Get model by name
-        auto res = model_configs.find(event.command.get_command_name());
-        if (res == model_configs.end()) {
+        auto res = config.models.find(event.command.get_command_name());
+        if (res == config.models.end()) {
             // Model does not exit, delete corresponding command
             bot.global_command_delete(event.command.get_command_interaction().id);
             return false;
@@ -493,7 +442,7 @@ private:
                 // Check for error
                 if (ccb.is_error()) {
                     std::cout << "Thread creation failed: " << ccb.get_error().message << std::endl;
-                    event.reply(dpp::message(texts.thread_create_fail).set_flags(dpp::message_flags::m_ephemeral));
+                    event.reply(dpp::message(config.texts.thread_create_fail).set_flags(dpp::message_flags::m_ephemeral));
                     return;
                 }
                 std::cout << "Responsible for creating thread: " << ccb.get<dpp::thread>().id << std::endl;
@@ -529,9 +478,8 @@ private:
     }
 
 public:
-    Bot(decltype(config) cfg, decltype(model_configs) model_configs, decltype(texts) texts)
-                : config(cfg), model_configs(model_configs), texts(texts),
-                  bot(cfg.token), db("database.sqlite3"),
+    Bot(decltype(config) cfg)
+                : config(cfg), bot(cfg.token), db("database.sqlite3"),
                   llm_pool(cfg.pool_size, "discord_llama", !cfg.persistance) {
         // Initialize database
         db << "CREATE TABLE IF NOT EXISTS threads ("
@@ -564,11 +512,11 @@ public:
             std::cout << "Connected to Discord." << std::endl;
             // Register chat command once
             if (dpp::run_once<struct register_bot_commands>()) {
-                for (const auto& [name, model] : model_configs) {
+                for (const auto& [name, model] : config.models) {
                     // Create command
                     dpp::slashcommand command(name, "Start a chat with me", bot.me.id);
                     // Add instruct mode option
-                    if (model.instruct_mode_policy == ModelConfig::InstructModePolicy::Allow) {
+                    if (model.instruct_mode_policy == Configuration::Model::InstructModePolicy::Allow) {
                         command.add_option(dpp::command_option(dpp::co_boolean, "instruct_mode", "Weather to enable instruct mode", false));
                     }
                     // Register command
@@ -663,21 +611,21 @@ public:
                     in_bot_thread = true;
                     channel_cfg.instruct_mode = instruct_mode;
                     // Find model
-                    auto res = model_configs.find(model_name);
-                    if (res == model_configs.end()) {
-                        bot.message_create(dpp::message(msg.channel_id, texts.model_missing));
+                    auto res = config.models.find(model_name);
+                    if (res == config.models.end()) {
+                        bot.message_create(dpp::message(msg.channel_id, config.texts.model_missing));
                         model_missing = true;
                         return;
                     }
                     channel_cfg.model_name = &res->first;
-                    channel_cfg.model_config = &res->second;
+                    channel_cfg.model = &res->second;
                 };
                 if (model_missing) return;
                 // Otherwise just fall back to the default model config if allowed
                 if (!in_bot_thread) {
                     if (config.threads_only) return;
                     channel_cfg.model_name = &config.default_inference_model;
-                    channel_cfg.model_config = config.default_inference_model_cfg;
+                    channel_cfg.model = config.default_inference_model_cfg;
                 }
                 // Append message
                 thread_pool.submit([=, this] () {
@@ -726,243 +674,13 @@ public:
 };
 
 
-bool parse_bool(const std::string& value) {
-    if (value == "true")
-        return true;
-    if (value == "false")
-        return false;
-    std::cerr << "Error: Failed to parse configuration file: Unknown bool (true/false): " << value << std::endl;
-    exit(-4);
-}
-Bot::ModelConfig::InstructModePolicy parse_instruct_mode_policy(const std::string& value) {
-    if (value == "allow")
-        return Bot::ModelConfig::InstructModePolicy::Allow;
-    if (value == "force")
-        return Bot::ModelConfig::InstructModePolicy::Force;
-    if (value == "forbid")
-        return Bot::ModelConfig::InstructModePolicy::Forbid;
-    std::cerr << "Error: Failed to parse model configuration file: Unknown instruct mode policy (allow/force/forbid): " << value << std::endl;
-    exit(-4);
-}
-
-bool file_exists(const auto& p) {
-    // Make sure we don't respond to some file that is actually called "none"...
-    if (p == "none") return false;
-    return std::filesystem::exists(p);
-}
-
 int main(int argc, char **argv) {
-    // Check arguments
-    if (argc < 2) {
-        std::cout << "Usage: " << argv[0] << " <config file location>" << std::endl;
-        return -1;
-    }
-
-    // Parse main configuration
-    Bot::Configuration cfg;
-    std::ifstream cfgf(argv[1]);
-    if (!cfgf) {
-        std::cerr << "Error: Failed to open configuration file: " << argv[1] << std::endl;
-        exit(-1);
-    }
-    for (std::string key; cfgf >> key;) {
-        // Read value
-        std::string value;
-        std::getline(cfgf, value);
-        // Erase all leading spaces
-        while (!value.empty() && (value[0] == ' ' || value[0] == '\t')) value.erase(0, 1);
-        // Check key and ignore comment lines
-        if (key == "token") {
-            cfg.token = std::move(value);
-        } else if (key == "language") {
-            cfg.language = std::move(value);
-        } else if (key == "default_inference_model") {
-            cfg.default_inference_model = std::move(value);
-            utils::clean_for_command_name(cfg.default_inference_model);
-        } else if (key == "translation_model") {
-            cfg.translation_model = std::move(value);
-            utils::clean_for_command_name(cfg.translation_model);
-        } else if (key == "prompt_file") {
-            cfg.prompt_file = std::move(value);
-        } else if (key == "instruct_prompt_file") {
-            cfg.instruct_prompt_file = std::move(value);
-        } else if (key == "models_dir") {
-            cfg.models_dir = std::move(value);
-        } else if (key == "texts_file") {
-            cfg.texts_file = std::move(value);
-        } else if (key == "pool_size") {
-            cfg.pool_size = std::stoi(value);
-        } else if (key == "threads") {
-            cfg.threads = std::stoi(value);
-        } else if (key == "scroll_keep") {
-            cfg.scroll_keep = std::stoi(value);
-        } else if (key == "shard_count") {
-            cfg.shard_count = std::stoi(value);
-        } else if (key == "shard_id") {
-            cfg.shard_id = std::stoi(value);
-        } else if (key == "timeout") {
-            cfg.timeout = std::stoi(value);
-        } else if (key == "ctx_size") {
-            cfg.ctx_size = std::stoi(value);
-        } else if (key == "max_context_age") {
-            cfg.max_context_age = std::stoi(value);
-        } else if (key == "mlock") {
-            cfg.mlock = parse_bool(value);
-        } else if (key == "live_edit") {
-            cfg.live_edit = parse_bool(value);
-        } else if (key == "threads_only") {
-            cfg.threads_only = parse_bool(value);
-        } else if (key == "persistance") {
-            cfg.persistance = parse_bool(value);
-        } else if (!key.empty() && key[0] != '#') {
-            std::cerr << "Error: Failed to parse configuration file: Unknown key: " << key << std::endl;
-            exit(-3);
-        }
-    }
-
-    // Parse texts_file
-    Bot::Texts texts;
-    if (cfg.texts_file != "none") {
-        std::ifstream textsf(cfg.texts_file);
-        if (!textsf) {
-            std::cerr << "Error: Failed to open texts file: " << cfg.texts_file << std::endl;
-            exit(-1);
-        }
-        for (std::string key; textsf >> key;) {
-            // Read value
-            std::string value;
-            std::getline(textsf, value);
-            // Erase all leading spaces
-            while (!value.empty() && (value[0] == ' ' || value[0] == '\t')) value.erase(0, 1);
-            // Check key and ignore comment lines
-            if (key == "model_missing") {
-                texts.model_missing = std::move(value);
-            } else if (key == "please_wait") {
-                texts.please_wait = std::move(value);
-            } else if (key == "thread_create_fail") {
-                texts.thread_create_fail = std::move(value);
-            } else if (key == "timeout") {
-                texts.timeout = std::move(value);
-            } else if (key == "translated") {
-                texts.translated = parse_bool(value);
-            } else if (!key.empty() && key[0] != '#') {
-                std::cerr << "Error: Failed to parse texts file: Unknown key: " << key << std::endl;
-                exit(-3);
-            }
-        }
-    }
-
-    // Parse model configurations
-    std::unordered_map<std::string, Bot::ModelConfig> models;
-    std::filesystem::path models_dir(cfg.models_dir);
-    bool allow_non_instruct = false;
-    for (const auto& file : std::filesystem::directory_iterator(models_dir)) {
-        // Check that file is model config
-        if (file.is_directory() ||
-            file.path().filename().extension() != ".txt") continue;
-        // Get model name
-        auto model_name = file.path().filename().string();
-        model_name.erase(model_name.size()-4, 4);
-        utils::clean_for_command_name(model_name);
-        // Parse model config
-        Bot::ModelConfig model_cfg;
-        std::ifstream cfgf(file.path());
-        if (!cfgf) {
-            std::cerr << "Error: Failed to open model configuration file: " << file << std::endl;
-            exit(-2);
-        }
-        std::string filename;
-        for (std::string key; cfgf >> key;) {
-            // Read value
-            std::string value;
-            std::getline(cfgf, value);
-            // Erase all leading spaces
-            while (!value.empty() && (value[0] == ' ' || value[0] == '\t')) value.erase(0, 1);
-            // Check key and ignore comment lines
-            if (key == "filename") {
-                filename = std::move(value);
-            } else if (key == "user_prompt") {
-                model_cfg.user_prompt = std::move(value);
-            } else if (key == "bot_prompt") {
-                model_cfg.bot_prompt = std::move(value);
-            } else if (key == "instruct_mode_policy") {
-                model_cfg.instruct_mode_policy = parse_instruct_mode_policy(value);
-            } else if (key == "emits_eos") {
-                model_cfg.emits_eos = parse_bool(value);
-            } else if (key == "no_translate") {
-                model_cfg.no_translate = parse_bool(value);
-            } else if (!key.empty() && key[0] != '#') {
-                std::cerr << "Error: Failed to parse model configuration file: Unknown key: " << key << std::endl;
-                exit(-3);
-            }
-        }
-        // Get full path
-        model_cfg.weight_path = file.path().parent_path()/filename;
-        // Safety checks
-        if (filename.empty() || !file_exists(model_cfg.weight_path)) {
-            std::cerr << "Error: Failed to parse model configuration file: Invalid weight filename: " << model_name << std::endl;
-            exit(-8);
-        }
-        if (model_cfg.instruct_mode_policy != Bot::ModelConfig::InstructModePolicy::Forbid &&
-            (model_cfg.user_prompt.empty() || model_cfg.bot_prompt.empty())) {
-            std::cerr << "Error: Failed to parse model configuration file: Instruct mode allowed but user prompt and bot prompt not given: " << model_name << std::endl;
-            exit(-9);
-        }
-        if (model_cfg.instruct_mode_policy != Bot::ModelConfig::InstructModePolicy::Force) {
-            allow_non_instruct = true;
-        }
-        // Add model to list
-        const auto& [stored_model_name, stored_model_cfg] = *models.emplace(std::move(model_name), std::move(model_cfg)).first;
-        // Set model pointer in config
-        if (stored_model_name == cfg.default_inference_model)
-            cfg.default_inference_model_cfg = &stored_model_cfg;
-        if (stored_model_name == cfg.translation_model)
-            cfg.translation_model_cfg = &stored_model_cfg;
-    }
-
-    // Safety checks
-    if (cfg.language != "EN") {
-        if (cfg.translation_model_cfg == nullptr) {
-            std::cerr << "Error: Translation model required for non-english language, but is invalid" << std::endl;
-            exit(-5);
-        }
-        if (cfg.translation_model_cfg->instruct_mode_policy == Bot::ModelConfig::InstructModePolicy::Force) {
-            std::cerr << "Error: Translation model is required to not have instruct mode forced" << std::endl;
-            exit(-10);
-        }
-        if (cfg.live_edit) {
-            std::cerr << "Warning: Live edit should not be enabled for non-english language" << std::endl;
-        }
-    }
-    if (allow_non_instruct && !file_exists(cfg.prompt_file)) {
-        std::cerr << "Error: Prompt file required when allowing non-instruct-mode use, but is invalid" << std::endl;
-        exit(-11);
-    }
-    if (!cfg.threads_only) {
-        if (cfg.default_inference_model_cfg == nullptr) {
-            std::cerr << "Error: Default model required if not threads only, but is invalid" << std::endl;
-            exit(-6);
-        }
-        if (cfg.default_inference_model_cfg->instruct_mode_policy == Bot::ModelConfig::InstructModePolicy::Force) {
-            std::cerr << "Error: Default model must not have instruct mode forced if not threads only" << std::endl;
-            exit(-7);
-        }
-    }
-    if (cfg.scroll_keep >= 99) {
-        std::cerr << "Error: Scroll_keep must be a non-float percentage and in a range of 0-99." << std::endl;
-        exit(-12);
-    }
-    if (cfg.shard_count == 0) {
-        std::cerr << "Error: Shard count must be above zero." << std::endl;
-        exit(-13);
-    }
-    if (cfg.shard_id >= cfg.shard_count) {
-        std::cerr << "Error: Not enough shards for this ID to exist." << std::endl;
-        exit(-13);
-    }
+    // Parse configuration
+    Configuration cfg;
+    cfg.parse_configs(argc<2?"":argv[1]);
 
     // Construct and configure bot
-    Bot bot(cfg, models, texts);
+    Bot bot(cfg);
 
     // Set signal handlers if available
 #   ifdef sa_sigaction
