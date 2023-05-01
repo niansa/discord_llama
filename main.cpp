@@ -138,7 +138,7 @@ private:
     LM::Inference &llm_start(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Get or create inference
-        auto& inference = llm_pool.create_inference(id, channel_cfg.model->weight_path, llm_get_params(channel_cfg.instruct_mode));
+        auto& inference = llm_pool.create_inference(id, channel_cfg.model->weights_path, llm_get_params(channel_cfg.instruct_mode));
         llm_restart(inference, channel_cfg);
         return inference;
     }
@@ -189,7 +189,7 @@ private:
             if (model_config.is_non_instruct_mode_allowed() &&
                     !std::filesystem::exists(filename) && config.prompt_file != "none") {
                 std::cout << "Building init_cache for "+model_name+"..." << std::endl;
-                auto llm = LM::Inference::construct(model_config.weight_path, llm_get_params());
+                auto llm = LM::Inference::construct(model_config.weights_path, llm_get_params());
                 // Add initial context
                 std::string prompt;
                 {
@@ -218,7 +218,7 @@ private:
             if (model_config.is_instruct_mode_allowed() &&
                     !std::filesystem::exists(filename) && config.instruct_prompt_file != "none") {
                 std::cout << "Building instruct_init_cache for "+model_name+"..." << std::endl;
-                auto llm = LM::Inference::construct(model_config.weight_path, llm_get_params());
+                auto llm = LM::Inference::construct(model_config.weights_path, llm_get_params());
                 // Add initial context
                 std::string prompt;
                 {
@@ -499,7 +499,7 @@ public:
         if (cfg.language != "EN") {
             thread_pool.submit([this] () {
                 std::cout << "Preparing translator..." << std::endl;
-                translator = std::make_unique<Translator>(config.translation_model_cfg->weight_path, llm_get_translation_params());
+                translator = std::make_unique<Translator>(config.translation_model_cfg->weights_path, llm_get_translation_params());
             });
         }
 

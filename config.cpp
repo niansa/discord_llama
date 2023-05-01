@@ -46,7 +46,7 @@ std::unordered_map<std::string, std::string> Configuration::environment_parser()
 void Configuration::Model::fill(const Configuration& cfg, std::unordered_map<std::string, std::string>&& map, bool ignore_extra) {
     for (auto& [key, value] : map) {
         if (key == "filename") {
-            weight_filename = std::move(value);
+            weights_filename = std::move(value);
         } else if (key == "user_prompt") {
             user_prompt = std::move(value);
         } else if (key == "bot_prompt") {
@@ -62,13 +62,13 @@ void Configuration::Model::fill(const Configuration& cfg, std::unordered_map<std
         }
     }
     // Get full path
-    weight_path = std::filesystem::path(cfg.models_dir)/weight_filename;
+    weights_path = std::filesystem::path(cfg.models_dir)/weights_filename;
 }
 
 void Configuration::Model::check(std::string& model_name, bool& allow_non_instruct) const {
     utils::clean_for_command_name(model_name);
     // Checks
-    if (weight_filename.empty() || !file_exists(weight_path)) {
+    if (weights_filename.empty() || !file_exists(weights_path)) {
         throw Exception("Error: Failed to parse model configuration file: Invalid weight filename: "+model_name);
     }
     if (instruct_mode_policy != InstructModePolicy::Forbid &&

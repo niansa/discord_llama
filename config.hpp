@@ -37,8 +37,8 @@ class Configuration {
 
 public:
     struct Model {
-        std::string weight_filename,
-                    weight_path,
+        std::string weights_filename,
+                    weights_path,
                     user_prompt,
                     bot_prompt;
         bool emits_eos = false,
