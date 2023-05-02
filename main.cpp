@@ -576,7 +576,7 @@ public:
             if (event.msg.content.empty()) return;
             // Ignore messges from channel on another shard
             bool this_shard = false;
-            db << "SELECT model, instruct_mode, this_shard FROM threads "
+            db << "SELECT this_shard FROM threads "
                   "WHERE id = ?;"
                     << std::to_string(event.msg.channel_id)
                     >> [&](int _this_shard) {
