@@ -363,7 +363,7 @@ private:
         });
     }
 
-    bool on_own_shard(dpp::snowflake id) const {
+    bool is_on_own_shard(dpp::snowflake id) const {
         return (unsigned(id.get_creation_time()) % config.shard_count) == config.shard_id;
     }
 
@@ -415,7 +415,7 @@ private:
             std::scoped_lock L(command_completion_buffer_mutex);
             command_completion_buffer.emplace(event.command.id, std::move(event));
             // And then actually stop
-            if (!on_own_shard(event.command.channel_id)) return false;
+            if (!is_on_own_shard(event.command.channel_id)) return false;
         }
         // Get model by name
         auto res = config.models.find(event.command.get_command_name());
@@ -450,11 +450,12 @@ private:
                 event.reply(dpp::message("Okay!").set_flags(dpp::message_flags::m_ephemeral));
             });
         } else {
+            bool this_shard = is_on_own_shard(thread->id);
             // Add thread to database
-            db << "INSERT INTO threads (id, model, instruct_mode) VALUES (?, ?, ?);"
-               << std::to_string(thread->id) << model_name << instruct_mode;
+            db << "INSERT INTO threads (id, model, instruct_mode, this_shard) VALUES (?, ?, ?, ?);"
+               << std::to_string(thread->id) << model_name << instruct_mode << this_shard;
             // Stop if this is not the correct shard for thread finalization
-            if (!on_own_shard(thread->id)) return false;
+            if (!this_shard) return false;
             // Set name
             std::cout << "Responsible for finalizing thread: " << thread->id << std::endl;
             thread->name = create_thread_name(model_name, instruct_mode);
@@ -486,6 +487,7 @@ public:
               "    id TEXT PRIMARY KEY NOT NULL,"
               "    model TEXT,"
               "    instruct_mode INTEGER,"
+              "    this_shard INTEGER,"
               "    UNIQUE(id)"
               ");";
 
@@ -573,7 +575,14 @@ public:
             // Make sure message has content
             if (event.msg.content.empty()) return;
             // Ignore messges from channel on another shard
-            if (!on_own_shard(event.msg.channel_id)) return;
+            bool this_shard = false;
+            db << "SELECT model, instruct_mode, this_shard FROM threads "
+                  "WHERE id = ?;"
+                    << std::to_string(event.msg.channel_id)
+                    >> [&](int _this_shard) {
+                this_shard = _this_shard;
+            };
+            if (!this_shard) return;
             // Ignore own messages
             if (event.msg.author.id == bot.me.id) {
                 // Add message to list of own messages
@@ -604,7 +613,7 @@ public:
                 // Attempt to find thread first...
                 bool in_bot_thread = false,
                      model_missing = false;
-                db << "SELECT model, instruct_mode FROM threads "
+                db << "SELECT model, instruct_mode, this_shard FROM threads "
                       "WHERE id = ?;"
                         << std::to_string(msg.channel_id)
                         >> [&](const std::string& model_name, int instruct_mode) {
