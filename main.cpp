@@ -65,6 +65,7 @@ private:
 #   define ENSURE_LLM_THREAD() if (std::this_thread::get_id() != llm_tid) {throw std::runtime_error("LLM execution of '"+std::string(__PRETTY_FUNCTION__)+"' on wrong thread detected");} 0
 
     // Must run in llama thread
+    //Note: Must be reworked to not return a string_view
     async::result<std::string_view> llm_translate_to_en(std::string_view text, bool skip = false) {
         ENSURE_LLM_THREAD();
         // Skip if there is no translator
@@ -86,6 +87,7 @@ private:
     }
 
     // Must run in llama thread
+    //Note: Must be reworked to not return a string_view
     async::result<std::string_view> llm_translate_from_en(std::string_view text, bool skip = false) {
         ENSURE_LLM_THREAD();
         // Skip if there is no translator
