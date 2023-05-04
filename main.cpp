@@ -139,7 +139,7 @@ private:
         ENSURE_LLM_THREAD();
         // Get or create inference
         auto inference = co_await llm_pool.create_inference(id, channel_cfg.model->weights_path, llm_get_params(channel_cfg.instruct_mode));
-        llm_restart(inference, channel_cfg);
+        co_await llm_restart(inference, channel_cfg);
         co_return inference;
     }
 
@@ -209,10 +209,10 @@ private:
                 using namespace fmt::literals;
                 if (prompt.back() != '\n') prompt.push_back('\n');
                 llm->set_scroll_callback(scroll_cb);
-                llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username), show_console_progress);
+                co_await llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username), show_console_progress);
                 // Serialize end result
                 std::ofstream f(filename, std::ios::binary);
-                llm->serialize(f);
+                co_await llm->serialize(f);
             }
             // Instruct prompt
             filename = model_name+"_instruct_init_cache";
@@ -238,10 +238,10 @@ private:
                 using namespace fmt::literals;
                 if (prompt.back() != '\n') prompt.push_back('\n');
                 llm->set_scroll_callback(scroll_cb);
-                llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username)+"\n\n"+model_config.user_prompt, show_console_progress);
+                co_await llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username)+"\n\n"+model_config.user_prompt, show_console_progress);
                 // Serialize end result
                 std::ofstream f(filename, std::ios::binary);
-                llm->serialize(f);
+                co_await llm->serialize(f);
             }
         }
         // Report complete init
@@ -268,23 +268,23 @@ private:
         // Instruct mode user prompt
         if (channel_cfg.instruct_mode) {
             // Append line as-is
-            inference->append("\n\n"+std::string(co_await llm_translate_to_en(msg.content, channel_cfg.model->no_translate))+'\n', cb);
+            co_await inference->append("\n\n"+std::string(co_await llm_translate_to_en(msg.content, channel_cfg.model->no_translate))+'\n', cb);
         } else {
             // Format and append lines
             for (const auto line : utils::str_split(msg.content, '\n')) {
-                inference->append(msg.author.username+": "+std::string(co_await llm_translate_to_en(line, channel_cfg.model->no_translate))+'\n', cb);
+                co_await inference->append(msg.author.username+": "+std::string(co_await llm_translate_to_en(line, channel_cfg.model->no_translate))+'\n', cb);
             }
         }
         // Append line break on timeout
-        if (timeout_exceeded) inference->append("\n");
+        if (timeout_exceeded) co_await inference->append("\n");
     }
     // Must run in llama thread
     async::result<void> prompt_add_trigger(const std::shared_ptr<LM::Inference>& inference, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         if (channel_cfg.instruct_mode) {
-            inference->append('\n'+channel_cfg.model->bot_prompt+"\n\n");
+            co_await inference->append('\n'+channel_cfg.model->bot_prompt+"\n\n");
         } else {
-            inference->append(bot.me.username+':', show_console_progress);
+            co_await inference->append(bot.me.username+':', show_console_progress);
         }
         co_return;
     }
@@ -685,7 +685,7 @@ public:
                                      co_await llm_pool.store_all();
                                  });
         }
-        sched_thread.shutdown();
+        sched_thread.wait();
     }
 };
 
