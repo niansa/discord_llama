@@ -294,53 +294,49 @@ private:
     // Must run in llama thread
     async::result<void> reply(dpp::snowflake id, dpp::message msg, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
-        try {
-            // Get inference
-            auto inference = co_await llm_get_inference(id, channel_cfg);
-            // Trigger LLM  correctly
-            co_await prompt_add_trigger(inference, channel_cfg);
-            // Run model
-            utils::Timer timeout;
-            utils::Timer edit_timer;
-            bool timeout_exceeded = false;
-            msg.content.clear();
-            auto output = co_await inference->run(channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n", [&] (std::string_view token) {
-                std::cout << token << std::flush;
-                if (timeout.get<std::chrono::seconds>() > config.timeout) {
-                    timeout_exceeded = true;
-                    std::cerr << "\nWarning: Timeout exceeded generating message";
-                    return false;
-                }
-                if (config.live_edit) {
-                    msg.content += token;
-                    if (edit_timer.get<std::chrono::seconds>() > 3) {
-                        try {
-                            bot.message_edit(msg);
-                        } catch (...) {}
-                        edit_timer.reset();
-                    }
-                }
-                return true;
-            });
-            std::cout << std::endl;
-            // Handle timeout
-            if (timeout_exceeded) {
-                if (config.live_edit) {
-                    output += "...\n"+config.texts.timeout;
-                } else {
-                    output = config.texts.timeout;
+        // Get inference
+        auto inference = co_await llm_get_inference(id, channel_cfg);
+        // Trigger LLM  correctly
+        co_await prompt_add_trigger(inference, channel_cfg);
+        // Run model
+        utils::Timer timeout;
+        utils::Timer edit_timer;
+        bool timeout_exceeded = false;
+        msg.content.clear();
+        auto output = co_await inference->run(channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n", [&] (std::string_view token) {
+            std::cout << token << std::flush;
+            if (timeout.get<std::chrono::seconds>() > config.timeout) {
+                timeout_exceeded = true;
+                std::cerr << "\nWarning: Timeout exceeded generating message";
+                return false;
+            }
+            if (config.live_edit) {
+                msg.content += token;
+                if (edit_timer.get<std::chrono::seconds>() > 3) {
+                    try {
+                        bot.message_edit(msg);
+                    } catch (...) {}
+                    edit_timer.reset();
                 }
             }
-            // Send resulting message
-            msg.content = co_await llm_translate_from_en(output, channel_cfg.model->no_translate);
-            bot.message_edit(msg);
-            // Prepare for next message
-            co_await inference->append("\n");
-            if (channel_cfg.model->emits_eos) {
-                co_await inference->append("\n"+channel_cfg.model->user_prompt);
+            return true;
+        });
+        std::cout << std::endl;
+        // Handle timeout
+        if (timeout_exceeded) {
+            if (config.live_edit) {
+                output += "...\n"+config.texts.timeout;
+            } else {
+                output = config.texts.timeout;
             }
-        } catch (const std::exception& e) {
-            std::cerr << "Warning: " << e.what() << std::endl;
+        }
+        // Send resulting message
+        msg.content = co_await llm_translate_from_en(output, channel_cfg.model->no_translate);
+        bot.message_edit(msg);
+        // Prepare for next message
+        co_await inference->append("\n");
+        if (channel_cfg.model->emits_eos) {
+            co_await inference->append("\n"+channel_cfg.model->user_prompt);
         }
     }
 
