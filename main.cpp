@@ -23,12 +23,12 @@
 #include <justlm.hpp>
 #include <justlm_pool.hpp>
 #include <anyproc.hpp>
-#include <ThreadPool.h>
+#include <scheduled_thread.hpp>
 
 
 
 class Bot {
-    ThreadPool thread_pool{1};
+    CoSched::ScheduledThread scheduler;
     LM::InferencePool llm_pool;
     std::unique_ptr<Translator> translator;
     std::vector<dpp::snowflake> my_messages;

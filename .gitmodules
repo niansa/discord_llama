@@ -4,3 +4,6 @@
 [submodule "libjustlm"]
 	path = libjustlm
 	url = https://gitlab.com/niansa/libjustlm.git
+[submodule "cosched"]
+	path = cosched
+	url = https://gitlab.com/niansa/cosched.git
