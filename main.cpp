@@ -28,7 +28,7 @@
 
 
 class Bot {
-    CoSched::ScheduledThread scheduler;
+    CoSched::ScheduledThread sched_thread;
     LM::InferencePool llm_pool;
     std::unique_ptr<Translator> translator;
     std::vector<dpp::snowflake> my_messages;
@@ -345,13 +345,13 @@ private:
     bool attempt_reply(const dpp::message& msg, const BotChannelConfig& channel_cfg) {
         // Reply if message contains username, mention or ID
         if (msg.content.find(bot.me.username) != std::string::npos) {
-            enqueue_reply(msg.channel_id, channel_cfg);
+            create_task_reply(msg.channel_id, channel_cfg);
             return true;
         }
         // Reply if message references user
         for (const auto msg_id : my_messages) {
             if (msg.message_reference.message_id == msg_id) {
-                enqueue_reply(msg.channel_id, channel_cfg);
+                create_task_reply(msg.channel_id, channel_cfg);
                 return true;
             }
         }
@@ -359,10 +359,12 @@ private:
         return false;
     }
 
-    void enqueue_reply(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
+    void create_task_reply(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
         bot.message_create(dpp::message(id, config.texts.please_wait+" :thinking:"), [=, this] (const dpp::confirmation_callback_t& ccb) {
             if (ccb.is_error()) return;
-            thread_pool.submit(std::bind(&Bot::reply, this, id, ccb.get<dpp::message>(), channel_cfg));
+            sched_thread.create_task("Language Model Shutdown", [=, this] () -> async::result<void> {
+                co_await reply(id, ccb.get<dpp::message>(), channel_cfg);
+            });
         });
     }
 
@@ -494,18 +496,16 @@ public:
               "    UNIQUE(id)"
               ");";
 
-        // Configure llm_pool
-        llm_pool.set_store_on_destruct(cfg.persistance);
-
-        // Initialize thread pool
-        thread_pool.init();
+        // Start Scheduled Thread
+        sched_thread.start();
 
         // Prepare translator
         if (cfg.language != "EN") {
-            thread_pool.submit([this] () {
-                std::cout << "Preparing translator..." << std::endl;
-                translator = std::make_unique<Translator>(config.translation_model_cfg->weights_path, llm_get_translation_params());
-            });
+            sched_thread.create_task("Translator", [this] () -> async::result<void> {
+                                     std::cout << "Preparing translator..." << std::endl;
+                                     translator = std::make_unique<Translator>(config.translation_model_cfg->weights_path, llm_get_translation_params());
+                                     co_return;
+                                 });
         }
 
         // Configure bot
@@ -532,7 +532,9 @@ public:
             }
             if (dpp::run_once<struct LM::Inference>()) {
                 // Prepare llm
-                thread_pool.submit(std::bind(&Bot::llm_init, this));
+                sched_thread.create_task("Language Model Initialization", [this] () -> async::result<void> {
+                                         co_await llm_init();
+                                     });
             }
         });
         bot.on_slashcommand([=, this](dpp::slashcommand_t event) {
@@ -598,9 +600,9 @@ public:
                 // Check for reset command
                 if (msg.content == "!reset") {
                     // Delete inference from pool
-                    thread_pool.submit([this, msg] () {
-                        llm_pool.delete_inference(msg.channel_id);
-                    });
+                    sched_thread.create_task("Language Model Inference Pool", [=, this] () -> async::result<void> {
+                                             co_await llm_pool.delete_inference(msg.channel_id);
+                                         });
                     // Delete message
                     bot.message_delete(msg.id, msg.channel_id);
                     return;
@@ -640,18 +642,18 @@ public:
                     channel_cfg.model = config.default_inference_model_cfg;
                 }
                 // Append message
-                thread_pool.submit([=, this] () {
-                    prompt_add_msg(msg, channel_cfg);
-                });
+                sched_thread.create_task("Language Model Inference ("+*channel_cfg.model_name+')', [=, this] () -> async::result<void> {
+                                         co_await prompt_add_msg(msg, channel_cfg);
+                                     });
                 // Handle message somehow...
                 if (in_bot_thread) {
                     // Send a reply
-                    enqueue_reply(msg.channel_id, channel_cfg);
+                    create_task_reply(msg.channel_id, channel_cfg);
                 } else if (msg.content == "!trigger") {
                     // Delete message
                     bot.message_delete(msg.id, msg.channel_id);
                     // Send a reply
-                    enqueue_reply(msg.channel_id, channel_cfg);
+                    create_task_reply(msg.channel_id, channel_cfg);
                 } else {
                     attempt_reply(msg, channel_cfg);
                 }
@@ -678,10 +680,12 @@ public:
         bot.start(dpp::st_wait);
     }
     void stop_prepare() {
-        thread_pool.submit([this] () {
-            llm_pool.store_all();
-        }).wait();
-        thread_pool.shutdown();
+        if (config.persistance) {
+            sched_thread.create_task("Language Model Shutdown", [=, this] () -> async::result<void> {
+                                     co_await llm_pool.store_all();
+                                 });
+        }
+        sched_thread.shutdown();
     }
 };
 
