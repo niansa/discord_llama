@@ -65,12 +65,12 @@ private:
 #   define ENSURE_LLM_THREAD() if (std::this_thread::get_id() != llm_tid) {throw std::runtime_error("LLM execution of '"+std::string(__PRETTY_FUNCTION__)+"' on wrong thread detected");} 0
 
     // Must run in llama thread
-    std::string_view llm_translate_to_en(std::string_view text, bool skip = false) {
+    async::result<std::string_view> llm_translate_to_en(std::string_view text, bool skip = false) {
         ENSURE_LLM_THREAD();
         // Skip if there is no translator
         if (translator == nullptr || skip) {
             std::cout << "(" << config.language << ") " << text << std::endl;
-            return text;
+            co_return text;
         }
         // I am optimizing heavily for the above case. This function always returns a reference so a trick is needed here
         static std::string fres;
@@ -78,20 +78,20 @@ private:
         // Replace bot username with [43]
         utils::str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
-        fres = translator->translate(fres, "EN", show_console_progress);
+        fres = co_await translator->translate(fres, "EN", show_console_progress);
         // Replace [43] back with bot username
         utils::str_replace_in_place(fres, "[43]", bot.me.username);
         std::cout << text << " --> (EN) " << fres << std::endl;
-        return fres;
+        co_return fres;
     }
 
     // Must run in llama thread
-    std::string_view llm_translate_from_en(std::string_view text, bool skip = false) {
+    async::result<std::string_view> llm_translate_from_en(std::string_view text, bool skip = false) {
         ENSURE_LLM_THREAD();
         // Skip if there is no translator
         if (translator == nullptr || skip) {
             std::cout << "(" << config.language << ") " << text << std::endl;
-            return text;
+            co_return text;
         }
         // I am optimizing heavily for the above case. This function always returns a reference so a trick is needed here
         static std::string fres;
@@ -99,11 +99,11 @@ private:
         // Replace bot username with [43]
         utils::str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
-        fres = translator->translate(fres, config.language, show_console_progress);
+        fres = co_await translator->translate(fres, config.language, show_console_progress);
         // Replace [43] back with bot username
         utils::str_replace_in_place(fres, "[43]", bot.me.username);
         std::cout << text << " --> (" << config.language << ") " << fres << std::endl;
-        return fres;
+        co_return fres;
     }
 
     LM::Inference::Params llm_get_translation_params() const {
@@ -124,54 +124,55 @@ private:
     }
 
     // Must run in llama thread
-    void llm_restart(LM::Inference& inference, const BotChannelConfig& channel_cfg) {
+    async::result<void> llm_restart(const std::shared_ptr<LM::Inference>& inference, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Deserialize init cache if not instruct mode without prompt file
-        if (channel_cfg.instruct_mode && config.instruct_prompt_file == "none") return;
+        if (channel_cfg.instruct_mode && config.instruct_prompt_file == "none") co_return;
         std::ifstream f((*channel_cfg.model_name)+(channel_cfg.instruct_mode?"_instruct_init_cache":"_init_cache"), std::ios::binary);
-        inference.deserialize(f);
+        co_await inference->deserialize(f);
         // Set params
-        inference.params.n_ctx_window_top_bar = inference.get_context_size();
-        inference.params.scroll_keep = float(config.scroll_keep) * 0.01f;
+        inference->params.n_ctx_window_top_bar = inference->get_context_size();
+        inference->params.scroll_keep = float(config.scroll_keep) * 0.01f;
     }
     // Must run in llama thread
-    LM::Inference &llm_start(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
+    async::result<std::shared_ptr<LM::Inference>> llm_start(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Get or create inference
-        auto& inference = llm_pool.create_inference(id, channel_cfg.model->weights_path, llm_get_params(channel_cfg.instruct_mode));
+        auto inference = co_await llm_pool.create_inference(id, channel_cfg.model->weights_path, llm_get_params(channel_cfg.instruct_mode));
         llm_restart(inference, channel_cfg);
-        return inference;
+        co_return inference;
     }
 
     // Must run in llama thread
-    LM::Inference &llm_get_inference(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
+    async::result<std::shared_ptr<LM::Inference>> llm_get_inference(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Get inference
-        auto inference_opt = llm_pool.get_inference(id);
-        if (!inference_opt.has_value()) {
+        auto fres = co_await llm_pool.get_inference(id);
+        if (!fres) {
             // Start new inference
-            inference_opt = llm_start(id, channel_cfg);
+            fres = co_await llm_start(id, channel_cfg);
         }
-        auto& fres = inference_opt.value();
         // Set scroll callback
-        fres.get().set_scroll_callback([msg = dpp::message(), channel_id = id] (float progress) {
+        fres->set_scroll_callback([msg = dpp::message(), channel_id = id] (float progress) {
             std::cout << "WARNING: " << channel_id << " is scrolling! " << progress << "% \r" << std::flush;
             return true;
         });
         // Return inference
-        return fres;
+        co_return fres;
     }
 
     // Must run in llama thread
-    void llm_init() {
+    async::result<void> llm_init() {
+        // Run at realtime priority
+        CoSched::Task::get_current().set_priority(CoSched::PRIO_REALTIME);
         // Set LLM thread
         llm_tid = std::this_thread::get_id();
         // Translate texts
         if (!config.texts.translated) {
-            config.texts.please_wait = llm_translate_from_en(config.texts.please_wait);
-            config.texts.model_missing = llm_translate_from_en(config.texts.model_missing);
-            config.texts.thread_create_fail = llm_translate_from_en(config.texts.thread_create_fail);
-            config.texts.timeout = llm_translate_from_en(config.texts.timeout);
+            config.texts.please_wait = co_await llm_translate_from_en(config.texts.please_wait);
+            config.texts.model_missing = co_await llm_translate_from_en(config.texts.model_missing);
+            config.texts.thread_create_fail = co_await llm_translate_from_en(config.texts.thread_create_fail);
+            config.texts.timeout = co_await llm_translate_from_en(config.texts.timeout);
             config.texts.translated = true;
         }
         // Set scroll callback
@@ -246,11 +247,12 @@ private:
         // Report complete init
         std::cout << "Init done!" << std::endl;
     }
+
     // Must run in llama thread
-    void prompt_add_msg(const dpp::message& msg, const BotChannelConfig& channel_cfg) {
+    async::result<void> prompt_add_msg(const dpp::message& msg, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Get inference
-        auto& inference = llm_get_inference(msg.channel_id, channel_cfg);
+        auto inference = co_await llm_get_inference(msg.channel_id, channel_cfg);
         std::string prefix;
         // Define callback for console progress and timeout
         utils::Timer timeout;
@@ -266,40 +268,41 @@ private:
         // Instruct mode user prompt
         if (channel_cfg.instruct_mode) {
             // Append line as-is
-            inference.append("\n\n"+std::string(llm_translate_to_en(msg.content, channel_cfg.model->no_translate))+'\n', cb);
+            inference->append("\n\n"+std::string(co_await llm_translate_to_en(msg.content, channel_cfg.model->no_translate))+'\n', cb);
         } else {
             // Format and append lines
             for (const auto line : utils::str_split(msg.content, '\n')) {
-                inference.append(msg.author.username+": "+std::string(llm_translate_to_en(line, channel_cfg.model->no_translate))+'\n', cb);
+                inference->append(msg.author.username+": "+std::string(co_await llm_translate_to_en(line, channel_cfg.model->no_translate))+'\n', cb);
             }
         }
         // Append line break on timeout
-        if (timeout_exceeded) inference.append("\n");
+        if (timeout_exceeded) inference->append("\n");
     }
     // Must run in llama thread
-    void prompt_add_trigger(LM::Inference& inference, const BotChannelConfig& channel_cfg) {
+    async::result<void> prompt_add_trigger(const std::shared_ptr<LM::Inference>& inference, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         if (channel_cfg.instruct_mode) {
-            inference.append('\n'+channel_cfg.model->bot_prompt+"\n\n");
+            inference->append('\n'+channel_cfg.model->bot_prompt+"\n\n");
         } else {
-            inference.append(bot.me.username+':', show_console_progress);
+            inference->append(bot.me.username+':', show_console_progress);
         }
+        co_return;
     }
 
     // Must run in llama thread
-    void reply(dpp::snowflake id, dpp::message msg, const BotChannelConfig& channel_cfg) {
+    async::result<void> reply(dpp::snowflake id, dpp::message msg, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         try {
             // Get inference
-            auto& inference = llm_get_inference(id, channel_cfg);
+            auto inference = co_await llm_get_inference(id, channel_cfg);
             // Trigger LLM  correctly
-            prompt_add_trigger(inference, channel_cfg);
+            co_await prompt_add_trigger(inference, channel_cfg);
             // Run model
             utils::Timer timeout;
             utils::Timer edit_timer;
             bool timeout_exceeded = false;
             msg.content.clear();
-            auto output = inference.run(channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n", [&] (std::string_view token) {
+            auto output = co_await inference->run(channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n", [&] (std::string_view token) {
                 std::cout << token << std::flush;
                 if (timeout.get<std::chrono::seconds>() > config.timeout) {
                     timeout_exceeded = true;
@@ -327,12 +330,12 @@ private:
                 }
             }
             // Send resulting message
-            msg.content = llm_translate_from_en(output, channel_cfg.model->no_translate);
+            msg.content = co_await llm_translate_from_en(output, channel_cfg.model->no_translate);
             bot.message_edit(msg);
             // Prepare for next message
-            inference.append("\n");
+            co_await inference->append("\n");
             if (channel_cfg.model->emits_eos) {
-                inference.append("\n"+channel_cfg.model->user_prompt);
+                co_await inference->append("\n"+channel_cfg.model->user_prompt);
             }
         } catch (const std::exception& e) {
             std::cerr << "Warning: " << e.what() << std::endl;
