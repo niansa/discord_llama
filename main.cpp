@@ -66,7 +66,7 @@ private:
 
     // Must run in llama thread
     //Note: Must be reworked to not return a string_view
-    async::result<std::string_view> llm_translate_to_en(std::string_view text, bool skip = false) {
+    CoSched::AwaitableTask<std::string_view> llm_translate_to_en(std::string_view text, bool skip = false) {
         ENSURE_LLM_THREAD();
         // Skip if there is no translator
         if (translator == nullptr || skip) {
@@ -88,7 +88,7 @@ private:
 
     // Must run in llama thread
     //Note: Must be reworked to not return a string_view
-    async::result<std::string_view> llm_translate_from_en(std::string_view text, bool skip = false) {
+    CoSched::AwaitableTask<std::string_view> llm_translate_from_en(std::string_view text, bool skip = false) {
         ENSURE_LLM_THREAD();
         // Skip if there is no translator
         if (translator == nullptr || skip) {
@@ -126,7 +126,7 @@ private:
     }
 
     // Must run in llama thread
-    async::result<void> llm_restart(const std::shared_ptr<LM::Inference>& inference, const BotChannelConfig& channel_cfg) {
+    CoSched::AwaitableTask<void> llm_restart(const std::shared_ptr<LM::Inference>& inference, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Deserialize init cache if not instruct mode without prompt file
         if (channel_cfg.instruct_mode && config.instruct_prompt_file == "none") co_return;
@@ -137,7 +137,7 @@ private:
         inference->params.scroll_keep = float(config.scroll_keep) * 0.01f;
     }
     // Must run in llama thread
-    async::result<std::shared_ptr<LM::Inference>> llm_start(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
+    CoSched::AwaitableTask<std::shared_ptr<LM::Inference>> llm_start(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Get or create inference
         auto inference = co_await llm_pool.create_inference(id, channel_cfg.model->weights_path, llm_get_params(channel_cfg.instruct_mode));
@@ -146,7 +146,7 @@ private:
     }
 
     // Must run in llama thread
-    async::result<std::shared_ptr<LM::Inference>> llm_get_inference(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
+    CoSched::AwaitableTask<std::shared_ptr<LM::Inference>> llm_get_inference(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Get inference
         auto fres = co_await llm_pool.get_inference(id);
@@ -164,7 +164,7 @@ private:
     }
 
     // Must run in llama thread
-    async::result<void> llm_init() {
+    CoSched::AwaitableTask<void> llm_init() {
         // Run at realtime priority
         CoSched::Task::get_current().set_priority(CoSched::PRIO_REALTIME);
         // Set LLM thread
@@ -251,7 +251,7 @@ private:
     }
 
     // Must run in llama thread
-    async::result<void> prompt_add_msg(const dpp::message& msg, const BotChannelConfig& channel_cfg) {
+    CoSched::AwaitableTask<void> prompt_add_msg(const dpp::message& msg, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Get inference
         auto inference = co_await llm_get_inference(msg.channel_id, channel_cfg);
@@ -281,7 +281,7 @@ private:
         if (timeout_exceeded) co_await inference->append("\n");
     }
     // Must run in llama thread
-    async::result<void> prompt_add_trigger(const std::shared_ptr<LM::Inference>& inference, const BotChannelConfig& channel_cfg) {
+    CoSched::AwaitableTask<void> prompt_add_trigger(const std::shared_ptr<LM::Inference>& inference, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         if (channel_cfg.instruct_mode) {
             co_await inference->append('\n'+channel_cfg.model->bot_prompt+"\n\n");
@@ -292,7 +292,7 @@ private:
     }
 
     // Must run in llama thread
-    async::result<void> reply(dpp::snowflake id, dpp::message msg, const BotChannelConfig& channel_cfg) {
+    CoSched::AwaitableTask<void> reply(dpp::snowflake id, dpp::message msg, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Get inference
         auto inference = co_await llm_get_inference(id, channel_cfg);
@@ -360,7 +360,7 @@ private:
     void create_task_reply(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
         bot.message_create(dpp::message(id, config.texts.please_wait+" :thinking:"), [=, this] (const dpp::confirmation_callback_t& ccb) {
             if (ccb.is_error()) return;
-            sched_thread.create_task("Language Model Shutdown", [=, this] () -> async::result<void> {
+            sched_thread.create_task("Language Model Shutdown", [=, this] () -> CoSched::AwaitableTask<void> {
                 co_await reply(id, ccb.get<dpp::message>(), channel_cfg);
             });
         });
@@ -499,7 +499,7 @@ public:
 
         // Prepare translator
         if (cfg.language != "EN") {
-            sched_thread.create_task("Translator", [this] () -> async::result<void> {
+            sched_thread.create_task("Translator", [this] () -> CoSched::AwaitableTask<void> {
                                      std::cout << "Preparing translator..." << std::endl;
                                      translator = std::make_unique<Translator>(config.translation_model_cfg->weights_path, llm_get_translation_params());
                                      co_return;
@@ -530,7 +530,7 @@ public:
             }
             if (dpp::run_once<struct LM::Inference>()) {
                 // Prepare llm
-                sched_thread.create_task("Language Model Initialization", [this] () -> async::result<void> {
+                sched_thread.create_task("Language Model Initialization", [this] () -> CoSched::AwaitableTask<void> {
                                          co_await llm_init();
                                      });
             }
@@ -598,7 +598,7 @@ public:
                 // Check for reset command
                 if (msg.content == "!reset") {
                     // Delete inference from pool
-                    sched_thread.create_task("Language Model Inference Pool", [=, this] () -> async::result<void> {
+                    sched_thread.create_task("Language Model Inference Pool", [=, this] () -> CoSched::AwaitableTask<void> {
                                              co_await llm_pool.delete_inference(msg.channel_id);
                                          });
                     // Delete message
@@ -640,7 +640,7 @@ public:
                     channel_cfg.model = config.default_inference_model_cfg;
                 }
                 // Append message
-                sched_thread.create_task("Language Model Inference ("+*channel_cfg.model_name+')', [=, this] () -> async::result<void> {
+                sched_thread.create_task("Language Model Inference ("+*channel_cfg.model_name+')', [=, this] () -> CoSched::AwaitableTask<void> {
                                          co_await prompt_add_msg(msg, channel_cfg);
                                      });
                 // Handle message somehow...
@@ -679,7 +679,7 @@ public:
     }
     void stop_prepare() {
         if (config.persistance) {
-            sched_thread.create_task("Language Model Shutdown", [=, this] () -> async::result<void> {
+            sched_thread.create_task("Language Model Shutdown", [=, this] () -> CoSched::AwaitableTask<void> {
                                      co_await llm_pool.store_all();
                                  });
         }
