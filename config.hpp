@@ -74,7 +74,8 @@ public:
         std::string please_wait = "Please wait...",
                     thread_create_fail = "Error: I couldn't create a thread here. Do I have enough permissions?",
                     model_missing = "Error: The model that was used in this thread could no longer be found.",
-                    timeout = "Error: Timeout";
+                    timeout = "Error: Timeout",
+                    terminated = "Error: Terminated";
         bool translated = false;
 
         void fill(std::unordered_map<std::string, std::string>&&, bool ignore_extra = false);

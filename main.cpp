@@ -169,6 +169,7 @@ private:
             config.texts.model_missing = co_await llm_translate_from_en(config.texts.model_missing);
             config.texts.thread_create_fail = co_await llm_translate_from_en(config.texts.thread_create_fail);
             config.texts.timeout = co_await llm_translate_from_en(config.texts.timeout);
+            config.texts.terminated = co_await llm_translate_from_en(config.texts.terminated);
             config.texts.translated = true;
         }
         // Set scroll callback
@@ -286,11 +287,8 @@ private:
     }
 
     // Must run in llama thread
-    CoSched::AwaitableTask<void> reply(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
+    CoSched::AwaitableTask<void> reply(dpp::snowflake id, dpp::message& new_msg, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
-        // Create initial message
-        auto msg = bot.message_create_sync(dpp::message(id, config.texts.please_wait+" :thinking:"));
-        co_await CoSched::Task::get_current().yield();
         // Get inference
         auto inference = co_await llm_get_inference(id, channel_cfg);
         // Trigger LLM correctly
@@ -298,23 +296,22 @@ private:
         // Run model
         utils::Timer timeout;
         utils::Timer edit_timer;
-        bool timeout_exceeded = false;
-        msg.content.clear();
+        new_msg.content.clear();
         const std::string reverse_prompt = channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n";
         auto output = co_await inference->run(reverse_prompt, [&] (std::string_view token) {
             std::cout << token << std::flush;
             // Check for timeout
             if (timeout.get<std::chrono::seconds>() > config.timeout) {
-                timeout_exceeded = true;
-                std::cerr << "\nWarning: Timeout exceeded generating message";
-                return false;
+                // Timeout reached, decrease priority
+                CoSched::Task::get_current().set_priority(-10);
+                //TODO: Add clock reaction
             }
             // Edit live
             if (config.live_edit) {
-                msg.content += token;
+                new_msg.content += token;
                 if (edit_timer.get<std::chrono::seconds>() > 3) {
                     try {
-                        bot.message_edit(msg);
+                        bot.message_edit(new_msg);
                     } catch (...) {}
                     edit_timer.reset();
                 }
@@ -323,16 +320,12 @@ private:
         });
         std::cout << std::endl;
         // Handle timeout
-        if (timeout_exceeded) {
-            if (config.live_edit) {
-                output += "...\n"+config.texts.timeout;
-            } else {
-                output = config.texts.timeout;
-            }
+        if (CoSched::Task::get_current().is_dead()) {
+            output += "...\n"+config.texts.terminated;
         }
         // Send resulting message
-        msg.content = co_await llm_translate_from_en(output, channel_cfg.model->no_translate);
-        bot.message_edit(msg);
+        new_msg.content = co_await llm_translate_from_en(output, channel_cfg.model->no_translate);
+        bot.message_edit(new_msg);
         // Prepare for next message
         co_await inference->append("\n");
         if (channel_cfg.model->emits_eos) {
@@ -340,16 +333,16 @@ private:
         }
     }
 
-    CoSched::AwaitableTask<bool> attempt_reply(const dpp::message& msg, const BotChannelConfig& channel_cfg) {
+    CoSched::AwaitableTask<bool> attempt_reply(const dpp::message& msg, dpp::message& placeholder_msg, const BotChannelConfig& channel_cfg) {
         // Reply if message contains username, mention or ID
         if (msg.content.find(bot.me.username) != std::string::npos) {
-            co_await reply(msg.channel_id, channel_cfg);
+            co_await reply(msg.channel_id, placeholder_msg, channel_cfg);
             co_return true;
         }
         // Reply if message references user
         for (const auto msg_id : my_messages) {
             if (msg.message_reference.message_id == msg_id) {
-                co_await reply(msg.channel_id, channel_cfg);
+                co_await reply(msg.channel_id, placeholder_msg, channel_cfg);
                 co_return true;
             }
         }
@@ -490,7 +483,7 @@ public:
 
         // Prepare translator
         if (cfg.language != "EN") {
-            sched_thread.create_task("Translator", [this] () -> CoSched::AwaitableTask<void> {
+            sched_thread.create_task("Translator Initialization", [this] () -> CoSched::AwaitableTask<void> {
                                      std::cout << "Preparing translator..." << std::endl;
                                      translator = std::make_unique<Translator>(config.translation_model_cfg->weights_path, llm_get_translation_params());
                                      co_return;
@@ -631,22 +624,55 @@ public:
                     channel_cfg.model = config.default_inference_model_cfg;
                 }
                 // Append message
-                sched_thread.create_task("Language Model Inference ("+*channel_cfg.model_name+')', [=, this] () -> CoSched::AwaitableTask<void> {
-                                         co_await prompt_add_msg(msg, channel_cfg);
-                                         // Handle message somehow...
-                                         if (in_bot_thread) {
-                                             // Send a reply
-                                             co_await reply(msg.channel_id, channel_cfg);
-                                         } else if (msg.content == "!trigger") {
-                                             // Delete message
-                                             bot.message_delete(msg.id, msg.channel_id);
-                                             // Send a reply
-                                             co_await reply(msg.channel_id, channel_cfg);
-                                         } else {
-                                             // Check more conditions in another function...
-                                             co_await attempt_reply(msg, channel_cfg);
-                                         }
-                                     });
+                sched_thread.create_task("Language Model Inference ("+*channel_cfg.model_name+" at "+std::to_string(msg.channel_id)+")", [=, this] () -> CoSched::AwaitableTask<void> {
+                    // Create initial message
+                    auto placeholder_msg = bot.message_create_sync(dpp::message(msg.channel_id, config.texts.please_wait+" :thinking:"));
+                    // Debug command
+                    if (msg.content == "!store") {
+                        llm_pool.store_all();
+                        co_return;
+                    }
+                    // Get task
+                    auto &task = CoSched::Task::get_current();
+                    // Await previous completion
+                    while (true) {
+                        // Check that there are no other tasks with the same name
+                        bool is_unique = true;
+                        for (const auto& other_task : task.get_scheduler().get_tasks()) {
+                            if (&task == other_task.get()) continue;
+                            if (task.get_name() == other_task->get_name()) {
+                                is_unique = false;
+                                break;
+                            }
+                        }
+                        // Stop looking if task is unique
+                        if (is_unique) break;
+                        // Suspend, we'll be woken up by that other task
+                        task.set_suspended(true);
+                        if (!co_await task.yield()) co_return;
+                    }
+                    // Add user message
+                    co_await prompt_add_msg(msg, channel_cfg);
+                    // Handle message somehow...
+                    if (in_bot_thread) {
+                        // Send a reply
+                        co_await reply(msg.channel_id, placeholder_msg, channel_cfg);
+                    } else if (msg.content == "!trigger") {
+                        // Delete message
+                        bot.message_delete(msg.id, msg.channel_id);
+                        // Send a reply
+                        co_await reply(msg.channel_id, placeholder_msg, channel_cfg);
+                    } else {
+                        // Check more conditions in another function...
+                        co_await attempt_reply(msg, placeholder_msg, channel_cfg);
+                    }
+                    // Unsuspend other tasks with same name
+                    for (const auto& other_task : task.get_scheduler().get_tasks()) {
+                        if (task.get_name() == other_task->get_name()) {
+                            other_task->set_suspended(false);
+                        }
+                    }
+                });
                 // Find thread embed
                 std::scoped_lock L(thread_embeds_mutex);
                 auto res = thread_embeds.find(msg.channel_id);
