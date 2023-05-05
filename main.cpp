@@ -65,17 +65,14 @@ private:
 #   define ENSURE_LLM_THREAD() if (std::this_thread::get_id() != llm_tid) {throw std::runtime_error("LLM execution of '"+std::string(__PRETTY_FUNCTION__)+"' on wrong thread detected");} 0
 
     // Must run in llama thread
-    //Note: Must be reworked to not return a string_view
-    CoSched::AwaitableTask<std::string_view> llm_translate_to_en(std::string_view text, bool skip = false) {
+    CoSched::AwaitableTask<std::string> llm_translate_to_en(std::string_view text, bool skip = false) {
         ENSURE_LLM_THREAD();
+        std::string fres(text);
         // Skip if there is no translator
         if (translator == nullptr || skip) {
             std::cout << "(" << config.language << ") " << text << std::endl;
-            co_return text;
+            co_return fres;
         }
-        // I am optimizing heavily for the above case. This function always returns a reference so a trick is needed here
-        static std::string fres;
-        fres = text;
         // Replace bot username with [43]
         utils::str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
@@ -87,17 +84,14 @@ private:
     }
 
     // Must run in llama thread
-    //Note: Must be reworked to not return a string_view
     CoSched::AwaitableTask<std::string_view> llm_translate_from_en(std::string_view text, bool skip = false) {
         ENSURE_LLM_THREAD();
+        std::string fres(text);
         // Skip if there is no translator
         if (translator == nullptr || skip) {
             std::cout << "(" << config.language << ") " << text << std::endl;
-            co_return text;
+            co_return fres;
         }
-        // I am optimizing heavily for the above case. This function always returns a reference so a trick is needed here
-        static std::string fres;
-        fres = text;
         // Replace bot username with [43]
         utils::str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
