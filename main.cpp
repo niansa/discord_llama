@@ -432,7 +432,7 @@ private:
         // Create thread if it doesn't exist or update it if it does
         if (thread == nullptr) {
             bot.thread_create(std::to_string(event.command.id), event.command.channel_id, 1440, dpp::CHANNEL_PUBLIC_THREAD, true, 15,
-                              [this, event, instruct_mode, model_name = res->first] (const dpp::confirmation_callback_t& ccb) {
+                              [this, event, model_name = res->first] (const dpp::confirmation_callback_t& ccb) {
                 // Check for error
                 if (ccb.is_error()) {
                     std::cout << "Thread creation failed: " << ccb.get_error().message << std::endl;
@@ -474,8 +474,8 @@ private:
 
 public:
     Bot(decltype(config) cfg)
-                : config(cfg), bot(cfg.token), db("database.sqlite3"),
-                  llm_pool(cfg.pool_size, "discord_llama", !cfg.persistance) {
+            : llm_pool(cfg.pool_size, "discord_llama", !cfg.persistance),
+              db("database.sqlite3"), bot(cfg.token), config(cfg) {
         // Initialize database
         db << "CREATE TABLE IF NOT EXISTS threads ("
               "    id TEXT PRIMARY KEY NOT NULL,"
@@ -519,7 +519,7 @@ public:
                     });
                 }
             }
-            if (dpp::run_once<struct LM::Inference>()) {
+            if (dpp::run_once<class LM::Inference>()) {
                 // Prepare llm
                 sched_thread.create_task("Language Model Initialization", [this] () -> CoSched::AwaitableTask<void> {
                                          co_await llm_init();
