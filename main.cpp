@@ -65,7 +65,7 @@ private:
 #   define ENSURE_LLM_THREAD() if (std::this_thread::get_id() != llm_tid) {throw std::runtime_error("LLM execution of '"+std::string(__PRETTY_FUNCTION__)+"' on wrong thread detected");} 0
 
     // Must run in llama thread
-    CoSched::AwaitableTask<std::string> llm_translate_to_en(std::string_view text, bool skip = false) {
+    CoSched::AwaitableTask<std::string> llm_translate_to_en(const std::string& text, bool skip = false) {
         ENSURE_LLM_THREAD();
         std::string fres(text);
         // Skip if there is no translator
@@ -84,7 +84,7 @@ private:
     }
 
     // Must run in llama thread
-    CoSched::AwaitableTask<std::string_view> llm_translate_from_en(std::string_view text, bool skip = false) {
+    CoSched::AwaitableTask<std::string> llm_translate_from_en(const std::string& text, bool skip = false) {
         ENSURE_LLM_THREAD();
         std::string fres(text);
         // Skip if there is no translator
@@ -268,7 +268,7 @@ private:
         } else {
             // Format and append lines
             for (const auto line : utils::str_split(msg.content, '\n')) {
-                co_await inference->append(msg.author.username+": "+std::string(co_await llm_translate_to_en(line, channel_cfg.model->no_translate))+'\n', cb);
+                co_await inference->append(msg.author.username+": "+std::string(co_await llm_translate_to_en(std::string(line), channel_cfg.model->no_translate))+'\n', cb);
             }
         }
         // Append line break on timeout
