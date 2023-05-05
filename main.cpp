@@ -292,24 +292,30 @@ private:
     }
 
     // Must run in llama thread
-    CoSched::AwaitableTask<void> reply(dpp::snowflake id, dpp::message msg, const BotChannelConfig& channel_cfg) {
+    CoSched::AwaitableTask<void> reply(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
+        // Create initial message
+        auto msg = bot.message_create_sync(dpp::message(id, config.texts.please_wait+" :thinking:"));
+        co_await CoSched::Task::get_current().yield();
         // Get inference
         auto inference = co_await llm_get_inference(id, channel_cfg);
-        // Trigger LLM  correctly
+        // Trigger LLM correctly
         co_await prompt_add_trigger(inference, channel_cfg);
         // Run model
         utils::Timer timeout;
         utils::Timer edit_timer;
         bool timeout_exceeded = false;
         msg.content.clear();
-        auto output = co_await inference->run(channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n", [&] (std::string_view token) {
+        const std::string reverse_prompt = channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n";
+        auto output = co_await inference->run(reverse_prompt, [&] (std::string_view token) {
             std::cout << token << std::flush;
+            // Check for timeout
             if (timeout.get<std::chrono::seconds>() > config.timeout) {
                 timeout_exceeded = true;
                 std::cerr << "\nWarning: Timeout exceeded generating message";
                 return false;
             }
+            // Edit live
             if (config.live_edit) {
                 msg.content += token;
                 if (edit_timer.get<std::chrono::seconds>() > 3) {
@@ -340,30 +346,21 @@ private:
         }
     }
 
-    bool attempt_reply(const dpp::message& msg, const BotChannelConfig& channel_cfg) {
+    CoSched::AwaitableTask<bool> attempt_reply(const dpp::message& msg, const BotChannelConfig& channel_cfg) {
         // Reply if message contains username, mention or ID
         if (msg.content.find(bot.me.username) != std::string::npos) {
-            create_task_reply(msg.channel_id, channel_cfg);
-            return true;
+            co_await reply(msg.channel_id, channel_cfg);
+            co_return true;
         }
         // Reply if message references user
         for (const auto msg_id : my_messages) {
             if (msg.message_reference.message_id == msg_id) {
-                create_task_reply(msg.channel_id, channel_cfg);
-                return true;
+                co_await reply(msg.channel_id, channel_cfg);
+                co_return true;
             }
         }
         // Don't reply otherwise
-        return false;
-    }
-
-    void create_task_reply(dpp::snowflake id, const BotChannelConfig& channel_cfg) {
-        bot.message_create(dpp::message(id, config.texts.please_wait+" :thinking:"), [=, this] (const dpp::confirmation_callback_t& ccb) {
-            if (ccb.is_error()) return;
-            sched_thread.create_task("Language Model Shutdown", [=, this] () -> CoSched::AwaitableTask<void> {
-                co_await reply(id, ccb.get<dpp::message>(), channel_cfg);
-            });
-        });
+        co_return false;
     }
 
     bool is_on_own_shard(dpp::snowflake id) const {
@@ -642,19 +639,20 @@ public:
                 // Append message
                 sched_thread.create_task("Language Model Inference ("+*channel_cfg.model_name+')', [=, this] () -> CoSched::AwaitableTask<void> {
                                          co_await prompt_add_msg(msg, channel_cfg);
+                                         // Handle message somehow...
+                                         if (in_bot_thread) {
+                                             // Send a reply
+                                             co_await reply(msg.channel_id, channel_cfg);
+                                         } else if (msg.content == "!trigger") {
+                                             // Delete message
+                                             bot.message_delete(msg.id, msg.channel_id);
+                                             // Send a reply
+                                             co_await reply(msg.channel_id, channel_cfg);
+                                         } else {
+                                             // Check more conditions in another function...
+                                             co_await attempt_reply(msg, channel_cfg);
+                                         }
                                      });
-                // Handle message somehow...
-                if (in_bot_thread) {
-                    // Send a reply
-                    create_task_reply(msg.channel_id, channel_cfg);
-                } else if (msg.content == "!trigger") {
-                    // Delete message
-                    bot.message_delete(msg.id, msg.channel_id);
-                    // Send a reply
-                    create_task_reply(msg.channel_id, channel_cfg);
-                } else {
-                    attempt_reply(msg, channel_cfg);
-                }
                 // Find thread embed
                 std::scoped_lock L(thread_embeds_mutex);
                 auto res = thread_embeds.find(msg.channel_id);
