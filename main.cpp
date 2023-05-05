@@ -255,10 +255,10 @@ private:
         utils::Timer timeout;
         bool timeout_exceeded = false;
         const auto cb = [&] (float progress) {
-            if (timeout.get<std::chrono::minutes>() > 1) {
-                std::cerr << "\nWarning: Timeout exceeded processing message" << std::endl;
-                timeout_exceeded = true;
-                return false;
+            if (timeout.get<std::chrono::seconds>() > config.timeout) {
+                // Timeout reached, decrease priority
+                CoSched::Task::get_current().set_priority(-5);
+                //TODO: Add clock reaction
             }
             return show_console_progress(progress);
         };
