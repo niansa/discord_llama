@@ -2,3 +2,4 @@ filename gpt4all-lora-unfiltered-quantized.bin
 instruct_mode_policy allow
 user_prompt ### Instruction:
 bot_prompt ### Response:
+emits_eos true
