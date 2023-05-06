@@ -195,6 +195,7 @@ private:
             config.texts.model_missing = co_await llm_translate_from_en(config.texts.model_missing);
             config.texts.thread_create_fail = co_await llm_translate_from_en(config.texts.thread_create_fail);
             config.texts.timeout = co_await llm_translate_from_en(config.texts.timeout);
+            config.texts.length_error = co_await llm_translate_from_en(config.texts.length_error);
             config.texts.terminated = co_await llm_translate_from_en(config.texts.terminated);
             config.texts.translated = true;
         }
@@ -324,10 +325,16 @@ private:
         new_msg.content.clear();
         const std::string reverse_prompt = channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n";
         uint8_t slow = 0;
+        bool response_too_long = false;
         auto output = co_await inference->run(reverse_prompt, [&] (std::string_view token) {
             std::cout << token << std::flush;
             // Check for timeout
             if (!check_timeout(timeout, new_msg, slow)) return false;
+            // Make sure message isn't too long
+            if (new_msg.content.size() > 3995-config.texts.length_error.size()) {
+                response_too_long = true;
+                return false;
+            }
             // Edit live
             if (config.live_edit) {
                 new_msg.content += token;
@@ -341,8 +348,12 @@ private:
             return true;
         });
         std::cout << std::endl;
+        // Handle message length error
+        if (response_too_long) {
+            output += "...\n"+config.texts.length_error;
+        }
         // Handle timeout
-        if (slow == 2) {
+        else if (slow == 2) {
             output += "...\n"+config.texts.timeout;
         }
         // Handle termination
@@ -352,6 +363,10 @@ private:
         // Send resulting message
         new_msg.content = co_await llm_translate_from_en(output, channel_cfg.model->no_translate);
         bot.message_edit(new_msg);
+        // Tell model about length error
+        if (response_too_long) {
+            co_await inference->append("... Response interrupted due to length error");
+        }
         // Prepare for next message
         co_await inference->append("\n");
         if (channel_cfg.model->emits_eos) {

@@ -75,6 +75,7 @@ public:
                     thread_create_fail = "Error: I couldn't create a thread here. Do I have enough permissions?",
                     model_missing = "Error: The model that was used in this thread could no longer be found.",
                     timeout = "Error: Timeout",
+                    length_error = "Error: Message length error",
                     terminated = "Error: Terminated";
         bool translated = false;
 
