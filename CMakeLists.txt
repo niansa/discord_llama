@@ -5,15 +5,15 @@ project(discord_llama LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(ANYPROC_COSCHED ON CACHE BOOL "" FORCE)
+set(LM_COSCHED ON CACHE BOOL "" FORCE)
+set(ANYPROC_EXAMPLES OFF CACHE BOOL "" FORCE)
+
 add_subdirectory(libjustlm)
 add_subdirectory(anyproc)
 add_subdirectory(cosched)
 add_subdirectory(DPP)
 add_subdirectory(fmt)
-
-set(ANYPROC_COSCHED ON CACHE BOOL "" FORCE)
-set(LM_COSCHED ON CACHE BOOL "" FORCE)
-set(ANYPROC_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 add_executable(discord_llama
     main.cpp
