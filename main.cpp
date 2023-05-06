@@ -298,19 +298,30 @@ private:
         utils::Timer edit_timer;
         new_msg.content.clear();
         const std::string reverse_prompt = channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n";
-        bool slow = false;
+        uint8_t slow = false;
         auto output = co_await inference->run(reverse_prompt, [&] (std::string_view token) {
             std::cout << token << std::flush;
             // Check for timeout
             auto passed = timeout.get<std::chrono::seconds>();
             if (passed > config.timeout) {
-                // Timeout reached, decrease priority
-                CoSched::Task::get_current().set_priority(-5*(passed/config.timeout));
+                auto& task = CoSched::Task::get_current();
+                // Calculate new priority
+                const CoSched::Priority prio = task.get_priority()-5;
+                // Make sure it's above minimum
+                if (prio < CoSched::PRIO_LOWEST) {
+                    // Stop generatoin
+                    slow = 2;
+                    return false;
+                }
+                // Decrease priority
+                task.set_priority(prio);
                 // Add snail reaction
                 if (!slow) {
-                    slow = true;
+                    slow = 1;
                     bot.message_add_reaction(new_msg, "🐌");
                 }
+                // Reset timeout timer
+                timeout.reset();
             }
             // Edit live
             if (config.live_edit) {
@@ -326,7 +337,11 @@ private:
         });
         std::cout << std::endl;
         // Handle timeout
-        if (CoSched::Task::get_current().is_dead()) {
+        if (slow == 2) {
+            output += "...\n"+config.texts.timeout;
+        }
+        // Handle termination
+        else if (CoSched::Task::get_current().is_dead()) {
             output += "...\n"+config.texts.terminated;
         }
         // Send resulting message
