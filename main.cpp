@@ -298,13 +298,19 @@ private:
         utils::Timer edit_timer;
         new_msg.content.clear();
         const std::string reverse_prompt = channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n";
+        bool slow = false;
         auto output = co_await inference->run(reverse_prompt, [&] (std::string_view token) {
             std::cout << token << std::flush;
             // Check for timeout
-            if (timeout.get<std::chrono::seconds>() > config.timeout) {
+            auto passed = timeout.get<std::chrono::seconds>();
+            if (passed > config.timeout) {
                 // Timeout reached, decrease priority
-                CoSched::Task::get_current().set_priority(-10);
-                //TODO: Add clock reaction
+                CoSched::Task::get_current().set_priority(-5*(passed/config.timeout));
+                // Add snail reaction
+                if (!slow) {
+                    slow = true;
+                    bot.message_add_reaction(new_msg, "🐌");
+                }
             }
             // Edit live
             if (config.live_edit) {
@@ -561,6 +567,10 @@ public:
             users[event.msg.author.id] = event.msg.author;
             // Make sure message has content
             if (event.msg.content.empty()) return;
+            if (event.msg.content == "!ping") {
+                bot.message_create(dpp::message(event.msg.channel_id, "Pong from shard "+std::to_string(config.shard_id+1)+'/'+std::to_string(config.shard_count)+'!'));
+                return;
+            }
             // Ignore messges from channel on another shard
             bool this_shard = false;
             db << "SELECT this_shard FROM threads "
@@ -578,17 +588,19 @@ public:
             }
             // Process message
             try {
-                dpp::message msg = event.msg;
                 // Check for reset command
-                if (msg.content == "!reset") {
+                if (event.msg.content == "!reset") {
                     // Delete inference from pool
-                    sched_thread.create_task("Language Model Inference Pool", [=, this] () -> CoSched::AwaitableTask<void> {
+                    sched_thread.create_task("Language Model Inference Pool", [msg = event.msg, this] () -> CoSched::AwaitableTask<void> {
                                              co_await llm_pool.delete_inference(msg.channel_id);
                                          });
                     // Delete message
-                    bot.message_delete(msg.id, msg.channel_id);
+                    bot.message_delete(event.msg.id, event.msg.channel_id);
+                    bot.message_create(dpp::message(event.msg.channel_id, "Conversation was reset by "+event.msg.author.format_username()+'!'));
                     return;
                 }
+                // Copy message
+                dpp::message msg = event.msg;
                 // Replace bot mentions with bot username
                 utils::str_replace_in_place(msg.content, "<@"+std::to_string(bot.me.id)+'>', bot.me.username);
                 // Replace all other known users
