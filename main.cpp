@@ -119,6 +119,32 @@ private:
         };
     }
 
+    bool check_timeout(utils::Timer& timer, const dpp::message& msg, uint8_t& slow) {
+        auto passed = timer.get<std::chrono::seconds>();
+        if (passed > config.timeout) {
+            auto& task = CoSched::Task::get_current();
+            // Calculate new priority
+            const CoSched::Priority prio = task.get_priority()-5;
+            // Make sure it's above minimum
+            if (prio < CoSched::PRIO_LOWEST) {
+                // Stop
+                slow = 2;
+                return false;
+            }
+            // Decrease priority
+            task.set_priority(prio);
+            // Add snail reaction
+            if (!slow) {
+                slow = 1;
+                bot.message_add_reaction(msg, "🐌");
+            }
+            // Reset timeout timer
+            timer.reset();
+        }
+        // No need to stop
+        return true;
+    }
+
     // Must run in llama thread
     CoSched::AwaitableTask<void> llm_restart(const std::shared_ptr<LM::Inference>& inference, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
@@ -254,12 +280,11 @@ private:
         // Define callback for console progress and timeout
         utils::Timer timeout;
         bool timeout_exceeded = false;
+        uint8_t slow = 0;
         const auto cb = [&] (float progress) {
-            if (timeout.get<std::chrono::seconds>() > config.timeout) {
-                // Timeout reached, decrease priority
-                CoSched::Task::get_current().set_priority(-5);
-                //TODO: Add clock reaction
-            }
+            // Check for timeout
+            if (!check_timeout(timeout, msg, slow)) return false;
+            // Show progress in console
             return show_console_progress(progress);
         };
         // Instruct mode user prompt
@@ -298,31 +323,11 @@ private:
         utils::Timer edit_timer;
         new_msg.content.clear();
         const std::string reverse_prompt = channel_cfg.instruct_mode?channel_cfg.model->user_prompt:"\n";
-        uint8_t slow = false;
+        uint8_t slow = 0;
         auto output = co_await inference->run(reverse_prompt, [&] (std::string_view token) {
             std::cout << token << std::flush;
             // Check for timeout
-            auto passed = timeout.get<std::chrono::seconds>();
-            if (passed > config.timeout) {
-                auto& task = CoSched::Task::get_current();
-                // Calculate new priority
-                const CoSched::Priority prio = task.get_priority()-5;
-                // Make sure it's above minimum
-                if (prio < CoSched::PRIO_LOWEST) {
-                    // Stop generatoin
-                    slow = 2;
-                    return false;
-                }
-                // Decrease priority
-                task.set_priority(prio);
-                // Add snail reaction
-                if (!slow) {
-                    slow = 1;
-                    bot.message_add_reaction(new_msg, "🐌");
-                }
-                // Reset timeout timer
-                timeout.reset();
-            }
+            if (!check_timeout(timeout, new_msg, slow)) return false;
             // Edit live
             if (config.live_edit) {
                 new_msg.content += token;
