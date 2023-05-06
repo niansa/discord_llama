@@ -47,7 +47,7 @@ pool_size 2
 # Amount of CPU threads to use
 threads 4
 
-# Response/Evaluation timeout in seconds
+# Response/Evaluation timeout in seconds; after which generation will be depriorized
 timeout 120
 
 # Max. context size
