@@ -369,8 +369,8 @@ private:
 
     std::string create_thread_name(const std::string& model_name, bool instruct_mode) const {
         return "Chat with "+model_name+" " // Model name
-                +(instruct_mode?"":"(Non Instruct mode) ") // Instruct mode
-                +'#'+(config.shard_count!=1?std::to_string(config.shard_id):""); // Shard ID
+                +(instruct_mode?"":"(Non Instruct mode)") // Instruct mode
+                +(config.shard_count!=1?(" #"+std::to_string(config.shard_id)):""); // Shard ID
     }
 
     dpp::embed create_chat_embed(dpp::snowflake guild_id, dpp::snowflake thread_id, const std::string& model_name, bool instruct_mode, const dpp::user& author, std::string_view first_message = "") const {
