@@ -362,7 +362,9 @@ private:
         }
         // Send resulting message
         new_msg.content = co_await llm_translate_from_en(output, channel_cfg.model->no_translate);
-        bot.message_edit(new_msg);
+        try {
+            bot.message_edit(new_msg);
+        } catch (...) {}
         // Tell model about length error
         if (response_too_long) {
             co_await inference->append("... Response interrupted due to length error");
