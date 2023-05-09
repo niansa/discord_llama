@@ -434,7 +434,7 @@ private:
         }
         // Warn about non-instruct mode
         if (instruct_mode == false) {
-            embed.add_field("Non instruct mode", "**In this mode, the quality is highly degraded**, but the conversation more humorous. Please avoid this if you want helpful responses or want to evaluate the models quality.");
+            embed.description += "\n\n**In the selected mode, the quality is highly degraded**, but the conversation more humorous. Please avoid this if you want helpful responses or want to evaluate the models quality.";
         }
         // Return final result
         return embed;
