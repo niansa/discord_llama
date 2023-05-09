@@ -432,6 +432,10 @@ private:
             }
             embed.description += "\n\n> "+shorted;
         }
+        // Warn about non-instruct mode
+        if (instruct_mode == false) {
+            embed.add_field("Non instruct mode", "In this mode, the quality is highly degraded, but the conversation more humorous. Please avoid this if you want helpful responses or want to evaluate the models quality.");
+        }
         // Return final result
         return embed;
     }
@@ -547,7 +551,7 @@ public:
                     dpp::slashcommand command(name, "Start a chat with me", bot.me.id);
                     // Add instruct mode option
                     if (model.instruct_mode_policy == Configuration::Model::InstructModePolicy::Allow) {
-                        command.add_option(dpp::command_option(dpp::co_boolean, "instruct_mode", "Weather to enable instruct mode", false));
+                        command.add_option(dpp::command_option(dpp::co_boolean, "instruct_mode", "Defaults to \"True\" for best output quality. Weather to enable instruct mode", false));
                     }
                     // Register command
                     bot.global_command_edit(command, [this, command] (const dpp::confirmation_callback_t& ccb) {
