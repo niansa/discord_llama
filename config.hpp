@@ -76,6 +76,7 @@ public:
                     model_missing = "Error: The model that was used in this thread could no longer be found.",
                     timeout = "Error: Timeout",
                     length_error = "Error: Message length error",
+                    empty_response = "Empty response",
                     terminated = "Error: Terminated";
         bool translated = false;
 
