@@ -608,6 +608,7 @@ public:
             users[event.msg.author.id] = event.msg.author;
             // Make sure message has content
             if (event.msg.content.empty()) return;
+            // Handle basic commands
             if (event.msg.content == "!ping") {
                 bot.message_create(dpp::message(event.msg.channel_id, "Pong from shard "+std::to_string(config.shard_id+1)+'/'+std::to_string(config.shard_count)+'!'));
                 return;
@@ -629,7 +630,7 @@ public:
             }
             // Process message
             try {
-                // Check for reset command
+                // Check for prompt commands
                 if (event.msg.content == "!reset") {
                     // Delete inference from pool
                     sched_thread.create_task("Language Model Inference Pool", [msg = event.msg, this] () -> CoSched::AwaitableTask<void> {
@@ -680,11 +681,6 @@ public:
                 sched_thread.create_task("Language Model Inference ("+*channel_cfg.model_name+" at "+std::to_string(msg.channel_id)+")", [=, this] () -> CoSched::AwaitableTask<void> {
                     // Create initial message
                     auto placeholder_msg = bot.message_create_sync(dpp::message(msg.channel_id, config.texts.please_wait+" :thinking:"));
-                    // Debug command
-                    if (msg.content == "!store") {
-                        llm_pool.store_all();
-                        co_return;
-                    }
                     // Get task
                     auto &task = CoSched::Task::get_current();
                     // Await previous completion
