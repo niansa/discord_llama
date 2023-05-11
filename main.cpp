@@ -281,13 +281,13 @@ private:
     }
 
     // Must run in llama thread
-    CoSched::AwaitableTask<void> prompt_add_msg(const dpp::message& msg, const BotChannelConfig& channel_cfg) {
+    CoSched::AwaitableTask<bool> prompt_add_msg(const dpp::message& msg, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         // Get inference
         auto inference = co_await llm_get_inference(msg.channel_id, channel_cfg);
         if (!inference) {
             std::cerr << "Warning: Failed to get inference" << std::endl;
-            co_return;
+            co_return false;
         }
         std::string prefix;
         // Define callback for console progress and timeout
@@ -303,15 +303,22 @@ private:
         // Instruct mode user prompt
         if (channel_cfg.instruct_mode) {
             // Append line as-is
-            co_await inference->append("\n\n"+std::string(co_await llm_translate_to_en(msg.content, channel_cfg.model->no_translate))+'\n', cb);
+            if (!co_await inference->append("\n\n"+std::string(co_await llm_translate_to_en(msg.content, channel_cfg.model->no_translate))+'\n', cb)) {
+                std::cerr << "Warning: Failed to append user prompt: " << inference->get_last_error() << std::endl;
+                co_return false;
+            }
         } else {
             // Format and append lines
             for (const auto line : utils::str_split(msg.content, '\n')) {
-                co_await inference->append(msg.author.username+": "+std::string(co_await llm_translate_to_en(std::string(line), channel_cfg.model->no_translate))+'\n', cb);
+                if (!co_await inference->append(msg.author.username+": "+std::string(co_await llm_translate_to_en(std::string(line), channel_cfg.model->no_translate))+'\n', cb)) {
+                    std::cerr << "Warning: Failed to append user prompt (single line): " << inference->get_last_error() << std::endl;
+                    co_return false;
+                }
             }
         }
         // Append line break on timeout
-        if (timeout_exceeded) co_await inference->append("\n");
+        if (timeout_exceeded) co_return co_await inference->append("\n");
+        co_return true;
     }
     // Must run in llama thread
     CoSched::AwaitableTask<bool> prompt_add_trigger(const std::shared_ptr<LM::Inference>& inference, const BotChannelConfig& channel_cfg) {
@@ -787,7 +794,10 @@ public:
                         if (!co_await task.yield()) co_return;
                     }
                     // Add user message
-                    co_await prompt_add_msg(msg, channel_cfg);
+                    if (!co_await prompt_add_msg(msg, channel_cfg)) {
+                        std::cerr << "Warning: Failed to add user message, not going to reply" << std::endl;
+                        co_return;
+                    }
                     // Handle message somehow...
                     if (in_bot_thread) {
                         // Send a reply
