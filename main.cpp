@@ -270,7 +270,7 @@ private:
                 using namespace fmt::literals;
                 if (prompt.back() != '\n') prompt.push_back('\n');
                 llm->set_scroll_callback(scroll_cb);
-                co_await llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username)+"\n\n"+model_config.user_prompt, show_console_progress);
+                co_await llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username, "bot_prompt"_a=model_config.bot_prompt, "user_prompt"_a=model_config.user_prompt)+"\n\n"+model_config.user_prompt, show_console_progress);
                 // Serialize end result
                 std::ofstream f(filename, std::ios::binary);
                 co_await llm->serialize(f);
