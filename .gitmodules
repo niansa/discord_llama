@@ -7,4 +7,3 @@
 [submodule "libjustlm"]
 	path = libjustlm
 	url = https://gitlab.com/niansa/libjustlm.git
-	branch = sharedobjects
