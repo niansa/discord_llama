@@ -148,7 +148,12 @@ private:
         ENSURE_LLM_THREAD();
         // Deserialize init cache if not instruct mode without prompt file
         if (channel_cfg.instruct_mode && config.instruct_prompt_file == "none") co_return true;
-        std::ifstream f((*channel_cfg.model_name)+(channel_cfg.instruct_mode?"_instruct_init_cache":"_init_cache"), std::ios::binary);
+        const auto path = (*channel_cfg.model_name)+(channel_cfg.instruct_mode?"_instruct_init_cache":"_init_cache");
+        std::ifstream f(path, std::ios::binary);
+        if (!f) {
+            std::cerr << "Warning: Failed to init cache open file, consider regeneration: " << path << std::endl;
+            co_return false;
+        }
         if (!co_await inference->deserialize(f)) {
             co_return false;
         }
@@ -163,6 +168,7 @@ private:
         // Get or create inference
         auto inference = co_await llm_pool.create_inference(id, channel_cfg.model->weights_path, llm_get_params(channel_cfg.instruct_mode));
         if (!co_await llm_restart(inference, channel_cfg)) {
+            std::cerr << "Warning: Failed to deserialize cache: " << inference->get_last_error() << std::endl;
             co_return nullptr;
         }
         co_return inference;
@@ -498,7 +504,7 @@ private:
             if (instruct_mode_param.index()) {
                 instruct_mode = std::get<bool>(instruct_mode_param);
             } else {
-                instruct_mode = true;
+                instruct_mode = model_config.instruct_mode_policy != Configuration::Model::InstructModePolicy::Forbid;
             }
         }
         // Create thread if it doesn't exist or update it if it does
