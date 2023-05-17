@@ -311,7 +311,7 @@ private:
         // Instruct mode user prompt
         if (channel_cfg.instruct_mode) {
             // Append line as-is
-            if (!co_await inference->append((channel_cfg.model->no_extra_linebreaks?"":"\n\n")
+            if (!co_await inference->append((channel_cfg.model->no_extra_linebreaks?"\n":"\n\n")
                                                 +std::string(co_await llm_translate_to_en(msg.content, channel_cfg.model->no_translate))
                                                 +(channel_cfg.model->no_extra_linebreaks?"":"\n"), cb)) {
                 std::cerr << "Warning: Failed to append user prompt: " << inference->get_last_error() << std::endl;
@@ -336,7 +336,7 @@ private:
         if (channel_cfg.instruct_mode) {
             co_return co_await inference->append((channel_cfg.model->no_extra_linebreaks?"":"\n")
                                                  +channel_cfg.model->bot_prompt
-                                                 +(channel_cfg.model->no_extra_linebreaks?"\n":"\n\n"));
+                                                 +(channel_cfg.model->no_extra_linebreaks?"":"\n\n"));
         } else {
             co_return co_await inference->append(bot.me.username+':', show_console_progress);
         }
