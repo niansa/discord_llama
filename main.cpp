@@ -731,7 +731,7 @@ public:
             // Make sure message has content
             if (event.msg.content.empty()) return;
             // Ignore messges from channel on another shard
-            bool this_shard = false;
+            bool this_shard = is_on_own_shard(event.msg.channel_id);
             db << "SELECT this_shard FROM threads "
                   "WHERE id = ?;"
                     << std::to_string(event.msg.channel_id)
