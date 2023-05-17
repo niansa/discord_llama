@@ -42,7 +42,8 @@ public:
                     user_prompt,
                     bot_prompt;
         bool emits_eos = false,
-             no_translate = false;
+             no_translate = false,
+             no_instruct_prompt = false;
         enum class InstructModePolicy {
             Allow = 0b11,
             Force = 0b10,

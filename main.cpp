@@ -260,7 +260,7 @@ private:
                 auto llm = LM::Inference::construct(model_config.weights_path, llm_get_params());
                 // Add initial context
                 std::string prompt;
-                if (config.instruct_prompt_file != "none") {
+                if (config.instruct_prompt_file != "none" && !model_config.no_instruct_prompt) {
                     // Read whole file
                     std::ifstream f(config.instruct_prompt_file);
                     if (!f) {

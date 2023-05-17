@@ -3,3 +3,4 @@ instruct_mode_policy force
 user_prompt <|im_start|>user
 bot_prompt <|im_end|>
 emits_eos true
+no_instruct_prompt true
