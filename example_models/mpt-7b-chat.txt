@@ -1,5 +1,5 @@
 filename ggml-mpt-7b-chat.bin
 instruct_mode_policy force
 user_prompt <|im_start|>user
-bot_prompt <|im_end|><|im_start|>assistant
+bot_prompt <|im_end|>
 emits_eos true
