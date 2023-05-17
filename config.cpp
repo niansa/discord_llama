@@ -59,6 +59,8 @@ void Configuration::Model::fill(const Configuration& cfg, std::unordered_map<std
             no_translate = parse_bool(value);
         } else if (key == "no_instruct_prompt") {
             no_instruct_prompt = parse_bool(value);
+        } else if (key == "no_extra_linebreaks") {
+            no_extra_linebreaks = parse_bool(value);
         } else if (!ignore_extra) {
             throw Exception("Error: Failed to parse model configuration file: Unknown key: "+key);
         }

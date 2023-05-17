@@ -273,9 +273,9 @@ private:
                     prompt = sstr.str();
                     // Append instruct prompt
                     using namespace fmt::literals;
-                    if (prompt.back() != '\n') prompt.push_back('\n');
+                    if (prompt.back() != '\n' && !model_config.no_extra_linebreaks) prompt.push_back('\n');
                     llm->set_scroll_callback(scroll_cb);
-                    co_await llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username, "bot_prompt"_a=model_config.bot_prompt, "user_prompt"_a=model_config.user_prompt)+"\n\n"+model_config.user_prompt, show_console_progress);
+                    co_await llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username, "bot_prompt"_a=model_config.bot_prompt, "user_prompt"_a=model_config.user_prompt)+(model_config.no_extra_linebreaks?"":"\n\n")+model_config.user_prompt, show_console_progress);
                 }
                 // Append user prompt
                 co_await llm->append(model_config.user_prompt);
@@ -311,7 +311,9 @@ private:
         // Instruct mode user prompt
         if (channel_cfg.instruct_mode) {
             // Append line as-is
-            if (!co_await inference->append("\n\n"+std::string(co_await llm_translate_to_en(msg.content, channel_cfg.model->no_translate))+'\n', cb)) {
+            if (!co_await inference->append((channel_cfg.model->no_extra_linebreaks?"":"\n\n")
+                                                +std::string(co_await llm_translate_to_en(msg.content, channel_cfg.model->no_translate))
+                                                +(channel_cfg.model->no_extra_linebreaks?"":"\n"), cb)) {
                 std::cerr << "Warning: Failed to append user prompt: " << inference->get_last_error() << std::endl;
                 co_return false;
             }
@@ -332,7 +334,9 @@ private:
     CoSched::AwaitableTask<bool> prompt_add_trigger(const std::shared_ptr<LM::Inference>& inference, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
         if (channel_cfg.instruct_mode) {
-            co_return co_await inference->append('\n'+channel_cfg.model->bot_prompt+"\n\n");
+            co_return co_await inference->append((channel_cfg.model->no_extra_linebreaks?"":"\n")
+                                                 +channel_cfg.model->bot_prompt
+                                                 +(channel_cfg.model->no_extra_linebreaks?"\n":"\n\n"));
         } else {
             co_return co_await inference->append(bot.me.username+':', show_console_progress);
         }
@@ -410,8 +414,10 @@ private:
             co_await inference->append("... Response interrupted due to length error");
         }
         // Prepare for next message
-        co_await inference->append("\n");
-        if (channel_cfg.model->emits_eos) {
+        if (!channel_cfg.instruct_mode || !channel_cfg.model->no_extra_linebreaks) {
+            co_await inference->append("\n");
+        }
+        if (channel_cfg.instruct_mode && channel_cfg.model->emits_eos) {
             co_await inference->append("\n"+channel_cfg.model->user_prompt);
         }
     }
