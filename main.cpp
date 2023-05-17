@@ -255,12 +255,12 @@ private:
             // Instruct prompt
             filename = model_name+"_instruct_init_cache";
             if (model_config.is_instruct_mode_allowed() &&
-                    !std::filesystem::exists(filename) && config.instruct_prompt_file != "none") {
+                    !std::filesystem::exists(filename)) {
                 std::cout << "Building instruct_init_cache for "+model_name+"..." << std::endl;
                 auto llm = LM::Inference::construct(model_config.weights_path, llm_get_params());
                 // Add initial context
                 std::string prompt;
-                {
+                if (config.instruct_prompt_file != "none") {
                     // Read whole file
                     std::ifstream f(config.instruct_prompt_file);
                     if (!f) {
@@ -271,12 +271,14 @@ private:
                     std::ostringstream sstr;
                     sstr << f.rdbuf();
                     prompt = sstr.str();
+                    // Append instruct prompt
+                    using namespace fmt::literals;
+                    if (prompt.back() != '\n') prompt.push_back('\n');
+                    llm->set_scroll_callback(scroll_cb);
+                    co_await llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username, "bot_prompt"_a=model_config.bot_prompt, "user_prompt"_a=model_config.user_prompt)+"\n\n"+model_config.user_prompt, show_console_progress);
                 }
-                // Append
-                using namespace fmt::literals;
-                if (prompt.back() != '\n') prompt.push_back('\n');
-                llm->set_scroll_callback(scroll_cb);
-                co_await llm->append(fmt::format(fmt::runtime(prompt), "bot_name"_a=bot.me.username, "bot_prompt"_a=model_config.bot_prompt, "user_prompt"_a=model_config.user_prompt)+"\n\n"+model_config.user_prompt, show_console_progress);
+                // Append user prompt
+                co_await llm->append(model_config.user_prompt);
                 // Serialize end result
                 std::ofstream f(filename, std::ios::binary);
                 co_await llm->serialize(f);
