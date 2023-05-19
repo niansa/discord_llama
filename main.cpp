@@ -672,7 +672,7 @@ public:
                             }
                         }
                         // Append line
-                        str += fmt::format(" - `{}` (State: **{}**, Priority: **{}**, User: **{}**)\n", task->get_name(), task->is_suspended()?"suspended":task->get_state_string(), task->get_priority(), user?user->format_username():bot.me.format_username());
+                        str += fmt::format("- `{}` (State: **{}**, Priority: **{}**, User: **{}**)\n", task->get_name(), task->is_suspended()?"suspended":task->get_state_string(), task->get_priority(), user?user->format_username():bot.me.format_username());
                     }
                     // Delete original thinking response
                     if (is_on_own_shard(event.command.channel_id)) {
