@@ -648,7 +648,9 @@ public:
                     co_await llm_pool.delete_inference(id);
                 });
                 // Sender message
-                bot.message_create(dpp::message(event.command.channel_id, "Conversation was reset by "+event.command.usr.format_username()+'!'));
+                if (is_on_own_shard(event.command.channel_id)) {
+                    bot.message_create(dpp::message(event.command.channel_id, "Conversation was reset by "+event.command.usr.format_username()+'!'));
+                }
                 // Finalize
                 invalidate_event(event);
                 return;
