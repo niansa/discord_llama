@@ -3,4 +3,3 @@ instruct_mode_policy force
 user_prompt ### Instruction: 
 bot_prompt ### Assistant: 
 emits_eos true
-no_extra_linebreaks true
