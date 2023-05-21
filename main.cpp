@@ -801,8 +801,7 @@ public:
                             if (&task == other_task.get()) continue;
                             if (task.get_name() == other_task->get_name()) {
                                 is_unique = false;
-                            }
-                            if (!other_task->is_suspended()) {
+                            } else if (!other_task->is_suspended()) {
                                 any_non_suspended = true;
                             }
                         }
