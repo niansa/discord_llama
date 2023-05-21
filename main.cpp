@@ -796,13 +796,18 @@ public:
                     while (true) {
                         // Check that there are no other tasks with the same name
                         bool is_unique = true;
+                        bool any_non_suspended = false;
                         for (const auto& other_task : task.get_scheduler().get_tasks()) {
                             if (&task == other_task.get()) continue;
                             if (task.get_name() == other_task->get_name()) {
                                 is_unique = false;
-                                break;
+                            }
+                            if (!other_task->is_suspended()) {
+                                any_non_suspended = true;
                             }
                         }
+                        // Stop looking if there is no task that isn't suspended
+                        if (!any_non_suspended) break;
                         // Stop looking if task is unique
                         if (is_unique) break;
                         // Suspend, we'll be woken up by that other task
