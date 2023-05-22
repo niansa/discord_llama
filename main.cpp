@@ -76,7 +76,7 @@ private:
         // Replace bot username with [43]
         utils::str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
-        co_await translator_mutex.lock();
+        auto L = co_await translator_mutex.lock();
         fres = co_await translator->translate(fres, "EN", show_console_progress);
         translator_mutex.unlock();
         // Replace [43] back with bot username
@@ -97,7 +97,7 @@ private:
         // Replace bot username with [43]
         utils::str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
-        co_await translator_mutex.lock();
+        auto L = co_await translator_mutex.lock();
         fres = co_await translator->translate(fres, config.language, show_console_progress);
         translator_mutex.unlock();
         // Replace [43] back with bot username
