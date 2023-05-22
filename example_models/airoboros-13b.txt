@@ -1,0 +1,5 @@
+filename airoboros-13B.q4_1.bin
+instruct_mode_policy force
+user_prompt USER:
+bot_prompt ASSISTANT:
+emits_eos true
