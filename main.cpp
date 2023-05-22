@@ -345,6 +345,8 @@ private:
     // Must run in llama thread
     CoSched::AwaitableTask<void> reply(dpp::snowflake id, dpp::message& new_msg, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
+        // Send placeholder
+        new_msg = bot.message_create_sync(new_msg);
         // Get inference
         auto inference = co_await llm_get_inference(id, channel_cfg);
         if (!inference) {
@@ -693,7 +695,7 @@ public:
             // Run command completion handler
             command_completion_handler(std::move(event));
         });
-        bot.on_message_create([=, this](...) {
+        bot.on_message_create([=, this](const dpp::message_create_t&) {
             // Attempt cleanup
             attempt_cleanup();
         });
@@ -789,7 +791,7 @@ public:
                 sched_thread.create_task("Language Model Inference ("+*channel_cfg.model_name+" at "+std::to_string(msg.channel_id)+")", [=, this] () -> CoSched::AwaitableTask<void> {
                     CoSched::Task::get_current().properties.emplace("user", msg.author);
                     // Create initial message
-                    auto placeholder_msg = bot.message_create_sync(dpp::message(msg.channel_id, config.texts.please_wait+" :thinking:"));
+                    dpp::message placeholder_msg(msg.channel_id, config.texts.please_wait+" :thinking:");
                     // Get task
                     auto &task = CoSched::Task::get_current();
                     // Await previous completion
