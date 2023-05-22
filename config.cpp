@@ -145,6 +145,8 @@ void Configuration::fill(std::unordered_map<std::string, std::string>&& map, boo
             ctx_size = std::stoi(value);
         } else if (key == "max_context_age") {
             max_context_age = std::stoi(value);
+        } else if (key == "random_response_chance") {
+            random_response_chance = std::stoi(value);
         } else if (key == "mlock") {
             mlock = parse_bool(value);
         } else if (key == "live_edit") {
@@ -191,6 +193,9 @@ void Configuration::check(bool allow_non_instruct) const {
     }
     if (shard_id >= shard_count) {
         throw Exception("Error: Not enough shards for this ID to exist.");
+    }
+    if (random_response_chance && threads_only) {
+        throw Exception("Error: Random responses may only be given if responses outside threads are allowed.");
     }
 }
 

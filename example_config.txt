@@ -5,6 +5,7 @@ models_dir models
 texts_file none
 language EN
 threads_only true
+random_response_chance 0
 live_edit false
 
 default_inference_model 13b-vanilla

@@ -11,8 +11,11 @@ texts_file none
 # Language everything is translated to (will be disabled if set to "EN" anyways)
 language EN
 
-# Weather the bot should respond to pings outside threads
+# Weather the bot should respond to pings outside threads. Disabling this may increase load by a LOT
 threads_only true
+
+# Chance for bot to respond at random when allowed to talk outside threads (see option above). Chance in percent is 100 divided by given number (Example: 2 = 50%). 0 implies no random responses
+random_response_chance 0
 
 # Weather the bot should update messages periodically while writing them. Incompatible with translation
 live_edit false

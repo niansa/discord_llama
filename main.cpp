@@ -22,6 +22,7 @@
 #include <justlm_pool.hpp>
 #include <anyproc.hpp>
 #include <scheduled_thread.hpp>
+#include <scheduler_mutex.hpp>
 
 
 
@@ -29,6 +30,7 @@ class Bot {
     CoSched::ScheduledThread sched_thread;
     LM::InferencePool llm_pool;
     std::unique_ptr<Translator> translator;
+    CoSched::Mutex translator_mutex;
     std::vector<dpp::snowflake> my_messages;
     std::unordered_map<dpp::snowflake, dpp::user> users;
     std::thread::id llm_tid;
@@ -74,7 +76,9 @@ private:
         // Replace bot username with [43]
         utils::str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
+        co_await translator_mutex.lock();
         fres = co_await translator->translate(fres, "EN", show_console_progress);
+        translator_mutex.unlock();
         // Replace [43] back with bot username
         utils::str_replace_in_place(fres, "[43]", bot.me.username);
         std::cout << text << " --> (EN) " << fres << std::endl;
@@ -93,7 +97,9 @@ private:
         // Replace bot username with [43]
         utils::str_replace_in_place(fres, bot.me.username, "[43]");
         // Run translation
+        co_await translator_mutex.lock();
         fres = co_await translator->translate(fres, config.language, show_console_progress);
+        translator_mutex.unlock();
         // Replace [43] back with bot username
         utils::str_replace_in_place(fres, "[43]", bot.me.username);
         std::cout << text << " --> (" << config.language << ") " << fres << std::endl;
@@ -433,6 +439,13 @@ private:
         // Reply if message references user
         for (const auto msg_id : my_messages) {
             if (msg.message_reference.message_id == msg_id) {
+                co_await reply(msg.channel_id, placeholder_msg, channel_cfg);
+                co_return true;
+            }
+        }
+        // Reply at random
+        if (config.random_response_chance) {
+            if (!(unsigned(msg.id.get_creation_time()) % config.random_response_chance)) {
                 co_await reply(msg.channel_id, placeholder_msg, channel_cfg);
                 co_return true;
             }

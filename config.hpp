@@ -101,7 +101,8 @@ public:
              scroll_keep = 20,
              shard_count = 1,
              shard_id = 0,
-             max_context_age = 0;
+             max_context_age = 0,
+             random_response_chance = 0;
     bool persistance = true,
          mlock = false,
          live_edit = false,
