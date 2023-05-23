@@ -351,8 +351,6 @@ private:
     // Must run in llama thread
     CoSched::AwaitableTask<void> reply(dpp::snowflake id, dpp::message& new_msg, const BotChannelConfig& channel_cfg) {
         ENSURE_LLM_THREAD();
-        // Send placeholder
-        new_msg = bot.message_create_sync(new_msg);
         // Get inference
         auto inference = co_await llm_get_inference(id, channel_cfg);
         if (!inference) {
@@ -430,28 +428,25 @@ private:
         }
     }
 
-    CoSched::AwaitableTask<bool> attempt_reply(const dpp::message& msg, dpp::message& placeholder_msg, const BotChannelConfig& channel_cfg) {
+    bool check_should_reply(const dpp::message& msg) {
         // Reply if message contains username, mention or ID
         if (msg.content.find(bot.me.username) != std::string::npos) {
-            co_await reply(msg.channel_id, placeholder_msg, channel_cfg);
-            co_return true;
+            return true;
         }
         // Reply if message references user
         for (const auto msg_id : my_messages) {
             if (msg.message_reference.message_id == msg_id) {
-                co_await reply(msg.channel_id, placeholder_msg, channel_cfg);
-                co_return true;
+                return true;
             }
         }
         // Reply at random
         if (config.random_response_chance) {
             if (!(unsigned(msg.id.get_creation_time()) % config.random_response_chance)) {
-                co_await reply(msg.channel_id, placeholder_msg, channel_cfg);
-                co_return true;
+                return true;
             }
         }
         // Don't reply otherwise
-        co_return false;
+        return false;
     }
 
     bool is_on_own_shard(dpp::snowflake id) const {
@@ -828,23 +823,32 @@ public:
                         task.set_suspended(true);
                         if (!co_await task.yield()) co_return;
                     }
-                    // Add user message
-                    if (!co_await prompt_add_msg(msg, channel_cfg)) {
-                        std::cerr << "Warning: Failed to add user message, not going to reply" << std::endl;
-                        co_return;
-                    }
-                    // Handle message somehow...
+                    // Check if message should reply
+                    bool should_reply = false;
                     if (in_bot_thread) {
-                        // Send a reply
-                        co_await reply(msg.channel_id, placeholder_msg, channel_cfg);
+                        should_reply = true;
                     } else if (msg.content == "!trigger") {
-                        // Delete message
                         bot.message_delete(msg.id, msg.channel_id);
+                        should_reply = true;
+                    } else {
+                        should_reply = check_should_reply(msg);
+                    }
+                    if (should_reply) {
+                        // Send placeholder
+                        placeholder_msg = bot.message_create_sync(placeholder_msg);
+                        // Add user message
+                        if (!co_await prompt_add_msg(msg, channel_cfg)) {
+                            std::cerr << "Warning: Failed to add user message, not going to reply" << std::endl;
+                            co_return;
+                        }
                         // Send a reply
                         co_await reply(msg.channel_id, placeholder_msg, channel_cfg);
                     } else {
-                        // Check more conditions in another function...
-                        co_await attempt_reply(msg, placeholder_msg, channel_cfg);
+                        // Add user message
+                        if (!co_await prompt_add_msg(msg, channel_cfg)) {
+                            std::cerr << "Warning: Failed to add user message" << std::endl;
+                            co_return;
+                        }
                     }
                     // Unsuspend other tasks with same name
                     for (const auto& other_task : task.get_scheduler().get_tasks()) {
