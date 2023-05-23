@@ -460,7 +460,7 @@ private:
 
     void cleanup() {
         // Clean up InferencePool
-        llm_pool.cleanup(config.max_context_age);
+        if (config.max_context_age) llm_pool.cleanup(config.max_context_age);
         // Reset timer
         cleanup_timer.reset();
     }
