@@ -377,7 +377,7 @@ private:
             // Check for timeout
             if (!check_timeout(timeout, new_msg, slow)) return false;
             // Make sure message isn't too long
-            if (new_msg.content.size() > 3995-config.texts.length_error.size()) {
+            if (new_msg.content.size() > 1995-config.texts.length_error.size()) {
                 response_too_long = true;
                 return false;
             }
