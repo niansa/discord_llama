@@ -1,0 +1,6 @@
+filename nous-hermes-13b.ggmlv3.q4_0.bin
+instruct_mode_policy allow
+user_prompt ### Instruction:
+bot_prompt ### Response:
+emits_eos true
+no_translate true
