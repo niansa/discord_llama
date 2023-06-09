@@ -199,13 +199,10 @@ void Configuration::check(bool allow_non_instruct) const {
     }
 }
 
-#include <iostream>
 void Configuration::parse_configs(const std::string &main_file) {
     const auto file_location = main_file.empty()?
                 std::filesystem::current_path():
                 std::filesystem::path(main_file).parent_path();
-
-    std::cout << main_file << std::endl;
 
     // Parse main configuration
     fill(environment_parser(), true);
