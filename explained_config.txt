@@ -8,9 +8,6 @@ models_dir models
 # File containing status texts. For example, see example_texts.txt
 texts_file none
 
-# Language everything is translated to (will be disabled if set to "EN" anyways)
-language EN
-
 # Weather the bot should respond to pings outside threads. Disabling this may increase load by a LOT
 threads_only true
 
@@ -22,9 +19,6 @@ live_edit false
 
 # Model to use outside threads
 default_inference_model 13b-vanilla
-
-# Model to be used for translation
-translation_model none
 
 # Few-shot prompt for non-instruct-mode. See example_prompt.txt
 prompt_file none

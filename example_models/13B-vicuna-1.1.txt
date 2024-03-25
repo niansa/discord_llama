@@ -3,4 +3,3 @@ instruct_mode_policy force
 user_prompt USER:
 bot_prompt ASSISTANT:
 emits_eos true
-no_translate true

@@ -3,13 +3,11 @@ token MTA0MDYxMTQzNjUwNzk1OTMyNw.Gl_iMU.jVVM3bRqBJVi8ORVpWHquOivlASGJpRySt8qFg
 # The following parameters are set to their defaults here and can be ommited
 models_dir models
 texts_file none
-language EN
 threads_only true
 random_response_chance 0
 live_edit false
 
 default_inference_model 13b-vanilla
-translation_model none
 
 prompt_file none
 instruct_prompt_file none
