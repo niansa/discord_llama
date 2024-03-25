@@ -55,8 +55,6 @@ void Configuration::Model::fill(const Configuration& cfg, std::unordered_map<std
             instruct_mode_policy = parse_instruct_mode_policy(value);
         } else if (key == "emits_eos") {
             emits_eos = parse_bool(value);
-        } else if (key == "no_translate") {
-            no_translate = parse_bool(value);
         } else if (key == "no_instruct_prompt") {
             no_instruct_prompt = parse_bool(value);
         } else if (key == "no_extra_linebreaks") {
@@ -96,8 +94,6 @@ void Configuration::Texts::fill(std::unordered_map<std::string, std::string>&& m
             thread_create_fail = std::move(value);
         } else if (key == "timeout") {
             timeout = std::move(value);
-        } else if (key == "translated") {
-            translated = parse_bool(value);
         } else if (!ignore_extra) {
             throw Exception("Error: Failed to parse texts file: Unknown key: "+key);
         }
@@ -113,14 +109,9 @@ void Configuration::fill(std::unordered_map<std::string, std::string>&& map, boo
     for (auto& [key, value] : map) {
         if (key == "token") {
             token = std::move(value);
-        } else if (key == "language") {
-            language = std::move(value);
         } else if (key == "default_inference_model") {
             default_inference_model = std::move(value);
             utils::clean_for_command_name(default_inference_model);
-        } else if (key == "translation_model") {
-            translation_model = std::move(value);
-            utils::clean_for_command_name(translation_model);
         } else if (key == "prompt_file") {
             prompt_file = std::move(value);
         } else if (key == "instruct_prompt_file") {
@@ -162,17 +153,6 @@ void Configuration::fill(std::unordered_map<std::string, std::string>&& map, boo
 }
 
 void Configuration::check(bool allow_non_instruct) const {
-    if (language != "EN") {
-        if (translation_model_cfg == nullptr) {
-            throw Exception("Error: Translation model required for non-english language, but is invalid");
-        }
-        if (translation_model_cfg->instruct_mode_policy == Model::InstructModePolicy::Force) {
-            throw Exception("Error: Translation model is required to not have instruct mode forced");
-        }
-        if (live_edit) {
-            throw Exception("Warning: Live edit should not be enabled for non-english language");
-        }
-    }
     if (allow_non_instruct && !file_exists(prompt_file)) {
         throw Exception("Error: Prompt file required when allowing non-instruct-mode use, but is invalid");
     }
@@ -244,8 +224,6 @@ void Configuration::parse_configs(const std::string &main_file) {
         // Set model pointer in config
         if (stored_model_name == default_inference_model)
             default_inference_model_cfg = &stored_model_cfg;
-        if (stored_model_name == translation_model)
-            translation_model_cfg = &stored_model_cfg;
     }
 
     // Check main configuration

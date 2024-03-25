@@ -1,5 +1,4 @@
 # Discord LLaMa
-A funny and multi-lingual Discord bot using LLaMa!
 
 ## Overview
 This Discord bot lets you use GPT-J and LLaMa models to both participate in your conversations and answer your questions in thread channels, in a ChatGPT-like fashion!

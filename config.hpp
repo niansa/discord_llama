@@ -42,7 +42,6 @@ public:
                     user_prompt,
                     bot_prompt;
         bool emits_eos = false,
-             no_translate = false,
              no_instruct_prompt = false,
              no_extra_linebreaks = false;
         enum class InstructModePolicy {
@@ -80,16 +79,13 @@ public:
                     length_error = "Error: Message length error",
                     empty_response = "Empty response",
                     terminated = "Error: Terminated";
-        bool translated = false;
 
         void fill(std::unordered_map<std::string, std::string>&&, bool ignore_extra = false);
         void check() const;
     };
 
     std::string token,
-                language = "EN",
                 default_inference_model = "13B-vanilla",
-                translation_model = "none",
                 prompt_file = "none",
                 instruct_prompt_file = "none",
                 models_dir = "models",
@@ -107,8 +103,7 @@ public:
          mlock = false,
          live_edit = false,
          threads_only = true;
-    const Model *default_inference_model_cfg = nullptr,
-                      *translation_model_cfg = nullptr;
+    const Model *default_inference_model_cfg = nullptr;
 
     std::unordered_map<std::string, Model> models;
     Texts texts;

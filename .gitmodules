@@ -1,9 +1,9 @@
-[submodule "cosched"]
-	path = cosched
-	url = https://gitlab.com/niansa/cosched.git
-[submodule "anyproc"]
-	path = anyproc
-	url = https://gitlab.com/niansa/anyproc.git
 [submodule "libjustlm"]
 	path = libjustlm
 	url = https://gitlab.com/niansa/libjustlm.git
+[submodule "cosched2"]
+	path = cosched2
+	url = https://gitfab.org/niansa/cosched2.git
+[submodule "DPP"]
+	path = DPP
+	url = https://github.com/brainboxdotcc/DPP.git
