@@ -500,6 +500,7 @@ private:
                 // Get message
                 const auto& msg = ccb.get<dpp::message>();
                 // Add to embed list
+                std::scoped_lock L(thread_embeds_mutex);
                 thread_embeds[thread_id] = msg;
             });
         }
